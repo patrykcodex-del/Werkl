@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum TaskStatus {
+  open
+  claimed
+  in_progress     @map("in-progress")
+  pending_verification
+  approved
+  rejected
+  completed
+  cancelled
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  paid
+  failed
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Task {
+  id               String       @id @default(cuid())
+  title            String
+  description      String
+  context          String?
+  status           TaskStatus   @default(open)
+  priority         TaskPriority @default(medium)
+  rewardAmount     Float?
+  rewardCurrency   String?
+  postedBy         String
+  assignedTo       String?
+  result           String?
+  verificationNote String?
+  paidOut          Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  earnings EarningEntry[]
+}
+
+model EarningEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  taskId    String
+  taskTitle String
+  amount    Float
+  currency  String   @default("USD")
+  earnedAt  DateTime @default(now())
+  paidOut   Boolean  @default(false)
+}
+
+model PayoutRequest {
+  id             String       @id @default(cuid())
+  userId         String
+  amount         Float
+  currency       String       @default("USD")
+  status         PayoutStatus @default(pending)
+  stripePayoutId String?
+  createdAt      DateTime     @default(now())
+}

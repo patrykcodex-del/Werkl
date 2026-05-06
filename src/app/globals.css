@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+    --terminal-bg: #04080a;
+    --terminal-surface: #080f10;
+    --terminal-border: #0d2a1e;
+    --terminal-green: #4ade80;
+    --terminal-green-dim: #16a34a;
+    --terminal-cyan: #22d3ee;
+    --terminal-amber: #fbbf24;
+    --terminal-red: #f87171;
+}
+
+* {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, 'Menlo', monospace;
+}
+
+body {
+    background-color: var(--terminal-bg);
+    color: var(--terminal-green);
+}
+
+/* Subtle scanline overlay */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 100, 0.015) 2px,
+        rgba(0, 255, 100, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* Blinking cursor utility */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+.cursor-blink::after {
+    content: '█';
+    animation: blink 1s step-end infinite;
+    color: var(--terminal-green);
+    margin-left: 2px;
+}
+
+/* Terminal scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--terminal-bg); }
+::-webkit-scrollbar-thumb { background: var(--terminal-green-dim); }
+
