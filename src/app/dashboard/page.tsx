@@ -12,41 +12,32 @@ export default async function DashboardPage() {
     const openTasks = allTasks.filter((t) => t.status === 'open');
 
     const stats = [
-        { label: 'open_tasks', value: openTasks.length, color: 'var(--terminal-green)' },
-        { label: 'my_tasks', value: myTasks.length, color: 'var(--terminal-cyan)' },
-        { label: 'completed', value: myTasks.filter((t) => t.status === 'completed').length, color: 'var(--terminal-green-dim)' },
-        { label: 'total_posted', value: allTasks.length, color: 'var(--terminal-green-dim)' },
+        { label: 'Open Tasks',   value: openTasks.length,                                        color: 'var(--green)' },
+        { label: 'My Tasks',     value: myTasks.length,                                           color: 'var(--accent)' },
+        { label: 'Completed',    value: myTasks.filter((t) => t.status === 'completed').length,   color: 'var(--text-secondary)' },
+        { label: 'Total Posted', value: allTasks.length,                                          color: 'var(--text-secondary)' },
     ];
 
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="border-b pb-4" style={{ borderColor: 'var(--terminal-border)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--terminal-green-dim)' }}>$ dashboard --user</p>
-                <h1 className="text-xl font-bold tracking-wider" style={{ color: 'var(--terminal-green)' }}>
-                    dashboard
-                </h1>
-                <p className="text-xs mt-1 tracking-wide" style={{ color: 'var(--terminal-green-dim)' }}>
-                    {session?.user
-                        ? `// session: ${session.user.name}`
-                        : '// no active session — sign in to claim tasks'}
+            <div>
+                <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Dashboard</h1>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    {session?.user ? `Welcome back, ${session.user.name}` : 'Sign in to start accepting tasks.'}
                 </p>
             </div>
 
-            {/* Stats grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {stats.map(({ label, value, color }) => (
                     <div
                         key={label}
-                        className="border p-4"
-                        style={{ borderColor: 'var(--terminal-border)', backgroundColor: 'var(--terminal-surface)' }}
+                        className="rounded-xl border p-5"
+                        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}
                     >
-                        <p className="text-xs tracking-wider mb-2" style={{ color: 'var(--terminal-green-dim)' }}>
-                            {label}
-                        </p>
-                        <p className="text-3xl font-bold tracking-wider" style={{ color }}>
-                            {value}
-                        </p>
+                        <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                        <p className="font-mono text-3xl font-bold" style={{ color }}>{value}</p>
                     </div>
                 ))}
             </div>
@@ -54,9 +45,7 @@ export default async function DashboardPage() {
             {/* My tasks */}
             {session?.user && (
                 <div className="space-y-3">
-                    <h2 className="text-sm font-semibold tracking-widest" style={{ color: 'var(--terminal-green)' }}>
-                        &gt; my_tasks
-                    </h2>
+                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>My Tasks</h2>
                     <TaskList tasks={myTasks} />
                 </div>
             )}
@@ -64,15 +53,9 @@ export default async function DashboardPage() {
             {/* Open tasks */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold tracking-widest" style={{ color: 'var(--terminal-green)' }}>
-                        &gt; open_tasks
-                    </h2>
-                    <a
-                        href="/tasks"
-                        className="text-xs tracking-wider hover:opacity-70 transition-opacity"
-                        style={{ color: 'var(--terminal-green-dim)' }}
-                    >
-                        view_all →
+                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Open Tasks</h2>
+                    <a href="/" className="text-sm transition-colors hover:opacity-80" style={{ color: 'var(--accent)' }}>
+                        View all →
                     </a>
                 </div>
                 <TaskList tasks={openTasks.slice(0, 6)} />

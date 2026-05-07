@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
                 amount: amountInCents,
                 currency: payout.currency.toLowerCase(),
                 destination: stripeAccountId,
-                description: `werkl.ai payout for ${userId}`,
+                description: `Werkl.ai payout for ${userId}`,
             });
             await updatePayoutRequest(payout.id, {
                 status: 'paid',

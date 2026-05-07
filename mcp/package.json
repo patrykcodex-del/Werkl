@@ -1,7 +1,7 @@
 {
   "name": "werkl-mcp-server",
   "version": "1.0.0",
-  "description": "MCP server for werkl.ai — lets AI agents post tasks for humans",
+  "description": "MCP server for Werkl.ai — lets AI agents post tasks for humans",
   "type": "module",
   "scripts": {
     "start": "tsx index.ts",

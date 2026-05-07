@@ -20,6 +20,7 @@ enum TaskStatus {
   approved
   rejected
   completed
+  expired
   cancelled
 }
 
@@ -28,6 +29,11 @@ enum TaskPriority {
   medium
   high
   urgent
+}
+
+enum TaskType {
+  sync
+  async
 }
 
 enum PayoutStatus {
@@ -46,13 +52,34 @@ model Task {
   context          String?
   status           TaskStatus   @default(open)
   priority         TaskPriority @default(medium)
+  taskType         TaskType     @default(async)
+
+  // Rewards
   rewardAmount     Float?
   rewardCurrency   String?
+
+  // Time limits
+  estimatedMins    Int?         // estimated work duration in minutes
+  claimTimeoutMins Int          @default(5)   // minutes a claim holds without submission
+  completionMins   Int?         // minutes to complete after claiming (null = no hard deadline)
+  expiresAt        DateTime?    // hard expiry while open — task auto-cancels
+
+  // Lifecycle timestamps
+  claimedAt          DateTime?
+  claimExpiresAt     DateTime?  // claimedAt + claimTimeoutMins
+  completionDeadline DateTime?  // claimedAt + completionMins
+
+  // Assignment
   postedBy         String
   assignedTo       String?
+  autoReassign     Boolean      @default(true)
+  reassignCount    Int          @default(0)
+
+  // Results
   result           String?
   verificationNote String?
   paidOut          Boolean      @default(false)
+
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -79,4 +106,17 @@ model PayoutRequest {
   status         PayoutStatus @default(pending)
   stripePayoutId String?
   createdAt      DateTime     @default(now())
+}
+
+model WorkerStat {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  totalClaimed       Int      @default(0)
+  totalCompleted     Int      @default(0)
+  totalApproved      Int      @default(0)
+  totalRejected      Int      @default(0)
+  totalExpired       Int      @default(0)  // timed out without submitting
+  avgCompletionSecs  Float?
+  reliabilityScore   Float    @default(1.0) // 0–1 composite score
+  updatedAt          DateTime @updatedAt
 }

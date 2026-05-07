@@ -3,19 +3,23 @@ import Link from 'next/link';
 
 const Footer = () => {
     return (
-        <footer
-            className="border-t mt-auto"
-            style={{ backgroundColor: 'var(--terminal-surface)', borderColor: 'var(--terminal-border)' }}
-        >
-            <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
-                <p className="text-xs tracking-wider" style={{ color: 'var(--terminal-green-dim)' }}>
-                    <span style={{ color: 'var(--terminal-green)' }}>werkl.ai</span>
-                    {' // '}&copy; {new Date().getFullYear()} — human fallback layer
-                </p>
-                <div className="flex gap-6 text-xs tracking-wider" style={{ color: 'var(--terminal-green-dim)' }}>
-                    <Link href="/" className="hover:text-green-400 transition-colors" style={{ color: 'inherit' }}>./home</Link>
-                    <Link href="/tasks" className="hover:text-green-400 transition-colors" style={{ color: 'inherit' }}>./tasks</Link>
-                    <Link href="/dashboard" className="hover:text-green-400 transition-colors" style={{ color: 'inherit' }}>./dashboard</Link>
+        <footer className="border-t mt-auto" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+            <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col md:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <span
+                        className="font-mono text-xs px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: 'var(--accent-glow)', color: 'var(--accent)' }}
+                    >
+                        AI
+                    </span>
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                        &copy; {new Date().getFullYear()} werkl.ai
+                    </p>
+                </div>
+                <div className="flex gap-5 text-sm" style={{ color: 'var(--text-muted)' }}>
+                    <Link href="/" className="transition-colors hover:text-slate-300" style={{ color: 'inherit' }}>Home</Link>
+                    <Link href="/" className="transition-colors hover:text-slate-300" style={{ color: 'inherit' }}>Tasks</Link>
+                    <Link href="/dashboard" className="transition-colors hover:text-slate-300" style={{ color: 'inherit' }}>Dashboard</Link>
                 </div>
             </div>
         </footer>

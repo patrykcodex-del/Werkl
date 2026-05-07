@@ -1,58 +1,54 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-    --terminal-bg: #04080a;
-    --terminal-surface: #080f10;
-    --terminal-border: #0d2a1e;
-    --terminal-green: #4ade80;
-    --terminal-green-dim: #16a34a;
-    --terminal-cyan: #22d3ee;
-    --terminal-amber: #fbbf24;
-    --terminal-red: #f87171;
-}
+    /* Backgrounds */
+    --bg-base:     #0f1117;
+    --bg-surface:  #171b24;
+    --bg-elevated: #1e2330;
 
-* {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, 'Menlo', monospace;
+    /* Borders */
+    --border:      #2a3044;
+    --border-dim:  #1f2636;
+
+    /* Accent — violet/indigo */
+    --accent:      #818cf8;
+    --accent-dim:  #4f46e5;
+    --accent-glow: rgba(129,140,248,0.12);
+
+    /* Text */
+    --text-primary:   #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted:     #475569;
+
+    /* Status colours */
+    --green:  #34d399;
+    --amber:  #fbbf24;
+    --red:    #f87171;
+    --cyan:   #67e8f9;
 }
 
 body {
-    background-color: var(--terminal-bg);
-    color: var(--terminal-green);
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
 }
 
-/* Subtle scanline overlay */
-body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0, 255, 100, 0.015) 2px,
-        rgba(0, 255, 100, 0.015) 4px
-    );
-    pointer-events: none;
-    z-index: 9999;
+/* Monospace for code-flavoured elements */
+.font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-/* Blinking cursor utility */
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-.cursor-blink::after {
-    content: '█';
-    animation: blink 1s step-end infinite;
-    color: var(--terminal-green);
-    margin-left: 2px;
-}
+/* Thin accent scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
 
-/* Terminal scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--terminal-bg); }
-::-webkit-scrollbar-thumb { background: var(--terminal-green-dim); }
-
+/* Pointer cursor on all interactive elements */
+button, a, [role="button"], label[for], select { cursor: pointer; }

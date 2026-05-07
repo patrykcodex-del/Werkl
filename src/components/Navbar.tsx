@@ -1,132 +1,168 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import Image from 'next/image';
 
 const navLinks = [
-    { href: '/', label: 'home' },
-    { href: '/dashboard', label: 'dashboard' },
-    { href: '/tasks', label: 'tasks' },
-    { href: '/earnings', label: 'earnings' },
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/earnings', label: 'Earnings' },
 ];
 
 const Navbar: React.FC = () => {
     const [open, setOpen] = useState(false);
+    const [visible, setVisible] = useState(true);
+    const lastScrollY = useRef(0);
     const { data: session, status } = useSession();
+
+    useEffect(() => {
+        const handleScroll = () => {
+            const current = window.scrollY;
+            // Always show when near the top
+            if (current < 10) {
+                setVisible(true);
+            } else if (current < lastScrollY.current) {
+                // Scrolling up → show
+                setVisible(true);
+            } else if (current > lastScrollY.current + 4) {
+                // Scrolling down (with a small dead-zone) → hide
+                setVisible(false);
+                setOpen(false);
+            }
+            lastScrollY.current = current;
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     return (
         <nav
-            className="sticky top-0 z-50 border-b"
-            style={{ backgroundColor: 'var(--terminal-surface)', borderColor: 'var(--terminal-border)' }}
+            className="fixed top-0 inset-x-0 z-50 border-b transition-transform duration-300"
+            style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border)',
+                transform: visible ? 'translateY(0)' : 'translateY(-100%)',
+            }}
         >
-            <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-12">
+            <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-2">
-                    <span className="text-sm" style={{ color: 'var(--terminal-green-dim)' }}>$</span>
-                    <span className="text-sm font-bold tracking-widest cursor-blink" style={{ color: 'var(--terminal-green)' }}>
-                        werkl.ai
+                <Link href="/" className="flex items-center gap-2 group">
+                    <span
+                        className="font-mono text-sm px-2 py-1 rounded"
+                        style={{ backgroundColor: 'var(--accent-glow)', color: 'var(--accent)' }}
+                    >
+                        AI
+                    </span>
+                    <span className="font-semibold text-lg tracking-wide" style={{ color: 'var(--text-primary)' }}>
+                        Werkl.ai
                     </span>
                 </Link>
 
                 {/* Desktop links */}
+                {session && (
                 <ul className="hidden md:flex items-center gap-1">
                     {navLinks.map(({ href, label }) => (
                         <li key={href}>
                             <Link
                                 href={href}
-                                className="px-3 py-1 text-xs tracking-wider border border-transparent transition-colors hover:border-green-900 hover:bg-green-950/30"
-                                style={{ color: 'var(--terminal-green-dim)' }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--terminal-green)')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--terminal-green-dim)')}
+                                className="px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-white/5"
+                                style={{ color: 'var(--text-secondary)' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
                             >
-                                ./{label}
+                                {label}
                             </Link>
                         </li>
                     ))}
                 </ul>
+                )}
 
                 {/* Desktop auth */}
                 <div className="hidden md:flex items-center gap-3">
                     {status === 'loading' ? (
-                        <span className="text-xs animate-pulse" style={{ color: 'var(--terminal-green-dim)' }}>[authenticating...]</span>
+                        <div className="w-6 h-6 rounded-full animate-pulse" style={{ backgroundColor: 'var(--border)' }} />
                     ) : session ? (
                         <div className="flex items-center gap-3">
                             {session.user?.image && (
                                 <Image
                                     src={session.user.image}
                                     alt={session.user.name ?? 'User'}
-                                    width={24}
-                                    height={24}
-                                    className="rounded-sm"
-                                    style={{ border: '1px solid var(--terminal-border)' }}
+                                    width={28}
+                                    height={28}
+                                    className="rounded-full ring-1"
+                                    style={{ ringColor: 'var(--border)' }}
                                 />
                             )}
-                            <span className="text-xs" style={{ color: 'var(--terminal-green-dim)' }}>
-                                [{session.user?.name}]
+                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                {session.user?.name}
                             </span>
                             <button
                                 onClick={() => signOut()}
-                                className="text-xs tracking-wider hover:opacity-70 transition-opacity"
-                                style={{ color: 'var(--terminal-red)' }}
+                                className="text-sm px-3 py-1.5 rounded-md transition-colors hover:bg-red-500/10"
+                                style={{ color: 'var(--red)' }}
                             >
-                                logout
+                                Sign out
                             </button>
                         </div>
                     ) : (
                         <button
-                            onClick={() => signIn('google')}
-                            className="px-3 py-1 text-xs tracking-wider border transition-colors hover:bg-green-950/30"
-                            style={{ color: 'var(--terminal-green)', borderColor: 'var(--terminal-green-dim)' }}
+                            onClick={() => signIn('google', {}, { prompt: 'select_account' })}
+                            className="px-4 py-1.5 text-sm font-medium rounded-md border transition-colors hover:bg-white/5"
+                            style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
                         >
-                            &gt; sign_in()
+                            Sign in
                         </button>
                     )}
                 </div>
 
                 {/* Mobile hamburger */}
                 <button
-                    className="md:hidden text-xs tracking-wider"
-                    style={{ color: 'var(--terminal-green-dim)' }}
+                    className="md:hidden p-2 rounded-md transition-colors hover:bg-white/5"
+                    style={{ color: 'var(--text-secondary)' }}
                     onClick={() => setOpen(!open)}
                     aria-label="Toggle menu"
                 >
-                    {open ? '[x]' : '[=]'}
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {open ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        )}
+                    </svg>
                 </button>
             </div>
 
             {/* Mobile menu */}
             {open && (
-                <div className="md:hidden border-t" style={{ backgroundColor: 'var(--terminal-surface)', borderColor: 'var(--terminal-border)' }}>
-                    <ul className="flex flex-col px-4 py-2 gap-1">
-                        {navLinks.map(({ href, label }) => (
+                <div className="md:hidden border-t" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+                    <ul className="flex flex-col px-4 py-3 gap-1">
+                        {session && navLinks.map(({ href, label }) => (
                             <li key={href}>
                                 <Link
                                     href={href}
-                                    className="block py-2 text-xs tracking-wider border-b"
-                                    style={{ color: 'var(--terminal-green)', borderColor: 'var(--terminal-border)' }}
+                                    className="block py-2 text-sm transition-colors"
+                                    style={{ color: 'var(--text-secondary)' }}
                                     onClick={() => setOpen(false)}
                                 >
-                                    $ ./{label}
+                                    {label}
                                 </Link>
                             </li>
                         ))}
-                        <li className="py-2">
+                        <li className="pt-3 border-t mt-1" style={{ borderColor: 'var(--border)' }}>
                             {session ? (
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs" style={{ color: 'var(--terminal-green-dim)' }}>[{session.user?.name}]</span>
-                                    <button onClick={() => signOut()} className="text-xs" style={{ color: 'var(--terminal-red)' }}>
-                                        logout
-                                    </button>
+                                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{session.user?.name}</span>
+                                    <button onClick={() => signOut()} className="text-sm" style={{ color: 'var(--red)' }}>Sign out</button>
                                 </div>
                             ) : (
                                 <button
-                                    onClick={() => signIn('google')}
-                                    className="w-full px-3 py-1.5 text-xs tracking-wider border"
-                                    style={{ color: 'var(--terminal-green)', borderColor: 'var(--terminal-green-dim)' }}
+                                    onClick={() => signIn('google', {}, { prompt: 'select_account' })}
+                                    className="w-full px-4 py-2 text-sm font-medium rounded-md border transition-colors hover:bg-white/5"
+                                    style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
                                 >
-                                    &gt; sign_in()
+                                    Sign in with Google
                                 </button>
                             )}
                         </li>
