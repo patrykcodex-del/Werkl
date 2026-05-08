@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import Image from 'next/image';
+import { ThemeToggle } from './ThemeToggle';
 
 const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
@@ -81,6 +82,7 @@ const Navbar: React.FC = () => {
 
                 {/* Desktop auth */}
                 <div className="hidden md:flex items-center gap-3">
+                    <ThemeToggle />
                     {status === 'loading' ? (
                         <div className="w-6 h-6 rounded-full animate-pulse" style={{ backgroundColor: 'var(--border)' }} />
                     ) : session ? (
@@ -117,13 +119,15 @@ const Navbar: React.FC = () => {
                     )}
                 </div>
 
-                {/* Mobile hamburger */}
-                <button
-                    className="md:hidden p-2 rounded-md transition-colors hover:bg-white/5"
-                    style={{ color: 'var(--text-secondary)' }}
-                    onClick={() => setOpen(!open)}
-                    aria-label="Toggle menu"
-                >
+                {/* Mobile controls */}
+                <div className="flex md:hidden items-center gap-2">
+                    <ThemeToggle />
+                    <button
+                        className="p-2 rounded-md transition-colors hover:bg-white/5"
+                        style={{ color: 'var(--text-secondary)' }}
+                        onClick={() => setOpen(!open)}
+                        aria-label="Toggle menu"
+                    >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         {open ? (
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -131,7 +135,8 @@ const Navbar: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                         )}
                     </svg>
-                </button>
+                    </button>
+                </div>
             </div>
 
             {/* Mobile menu */}

@@ -123,7 +123,7 @@ export default function HomePage() {
                         {/* Left — copy */}
                         <div
                             className="flex flex-col justify-center gap-8 px-10 py-14 md:py-16"
-                            style={{ backgroundColor: 'var(--bg-elevated)' }}
+                            style={{ backgroundColor: 'var(--bg-surface)' }}
                         >
                             {/* Live indicator */}
                             <div className="flex items-center gap-2">
@@ -163,15 +163,19 @@ export default function HomePage() {
                             <div className="flex flex-wrap gap-3">
                                 <Link
                                     href="/auth/signin"
-                                    className="px-5 py-2.5 text-sm font-medium rounded-md border transition-colors hover:bg-white/5"
-                                    style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                                    className="cursor-pointer px-5 py-2.5 text-sm font-medium rounded-md border transition-colors"
+                                    style={{ color: 'var(--accent)', borderColor: 'var(--accent)', backgroundColor: 'var(--accent-glow)' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--accent-dim)', e.currentTarget.style.color = '#fff')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--accent-glow)', e.currentTarget.style.color = 'var(--accent)')}
                                 >
                                     Start earning now →
                                 </Link>
                                 <a
                                     href="#tasks"
-                                    className="px-5 py-2.5 text-sm font-semibold rounded-lg border transition-colors hover:bg-white/5"
-                                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                                    className="cursor-pointer px-5 py-2.5 text-sm font-semibold rounded-lg border transition-colors"
+                                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', backgroundColor: 'transparent' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-base)')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                 >
                                     Browse open tasks
                                 </a>
@@ -180,123 +184,117 @@ export default function HomePage() {
                             {/* Stats row */}
                             <div className="flex gap-0 border-t pt-6" style={{ borderColor: 'var(--border)' }}>
                                 {[
-                                    { value: '$2–$10', label: 'per task' },
-                                    { value: '~5 min', label: 'avg. time' },
-                                    { value: '100%', label: 'remote' },
+                                    { value: '$2–$10', label: 'avg. per task' },
+                                    { value: '~5 min', label: 'avg. completion' },
+                                    { value: '100%', label: 'fully remote' },
                                 ].map(({ value, label }, i) => (
                                     <div
                                         key={label}
-                                        className="flex-1 flex flex-col gap-0.5 pr-4"
+                                        className="flex-1 flex flex-col gap-1 pr-4"
                                         style={i > 0 ? { borderLeft: '1px solid var(--border)', paddingLeft: '1rem' } : {}}
                                     >
                                         <p className="text-xl md:text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
-                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                                        <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Right — mock live task feed */}
+                        {/* Right — how it works steps */}
                         <div
-                            className="hidden md:flex flex-col gap-3 px-6 py-8 border-l"
-                            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-elevated)' }}
+                            className="hidden md:flex flex-col justify-center gap-12 px-12 py-16 border-l"
+                            style={{
+                                borderColor: 'var(--border)',
+                                background: `
+                                    radial-gradient(ellipse at 15% 85%, rgba(251,191,36,0.09) 0%, transparent 50%),
+                                    radial-gradient(ellipse at 85% 15%, rgba(99,102,241,0.13) 0%, transparent 50%),
+                                    var(--bg-elevated)
+                                `,
+                            }}
                         >
-                            {/* Feed header */}
-                            <div className="flex items-center justify-between mb-1">
-                                <span className="font-mono text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                                    Live task feed
-                                </span>
-                                <span
-                                    className="font-mono text-xs px-2 py-0.5 rounded-full"
-                                    style={{ color: 'var(--accent)', backgroundColor: 'var(--accent-glow)' }}
-                                >
-                                    open
-                                </span>
+                            {/* Section label */}
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-3">
+                                    <span className="h-px flex-1" style={{ backgroundColor: 'var(--text-muted)' }} />
+                                    <p className="font-mono text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
+                                        How it works
+                                    </p>
+                                    <span className="h-px flex-1" style={{ backgroundColor: 'var(--text-muted)' }} />
+                                </div>
+                                <p className="text-center text-2xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                                    Easy as{' '}
+                                    <span style={{ color: 'var(--accent)' }}>1</span>
+                                    <span style={{ color: 'var(--amber)' }}>2</span>
+                                    <span style={{ color: 'var(--green)' }}>3</span>
+                                </p>
                             </div>
 
-                            {/* Real task cards — top 3 in priority order */}
-                            {[...tasks].sort((a, b) => {
-                                const order = { urgent: 0, high: 1, medium: 2, low: 3 };
-                                return (order[a.priority] ?? 2) - (order[b.priority] ?? 2);
-                            }).slice(0, 3).map((task) => {
-                                const priorityStyles: Record<string, { label: string; color: string; bg: string }> = {
-                                    low:    { label: 'Low',        color: 'var(--text-muted)',  bg: 'rgba(71,85,105,0.2)' },
-                                    medium: { label: 'Standard',   color: 'var(--accent)',      bg: 'var(--accent-glow)' },
-                                    high:   { label: 'High Value', color: 'var(--amber)',       bg: 'rgba(251,191,36,0.1)' },
-                                    urgent: { label: '🔥 Hot',     color: 'var(--red)',         bg: 'rgba(248,113,113,0.1)' },
-                                };
-                                const pri = priorityStyles[task.priority] ?? priorityStyles.medium;
-                                const reward = task.reward
-                                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: task.reward.currency }).format(task.reward.amount)
-                                    : null;
-                                const ago = (() => {
-                                    const diff = Date.now() - new Date(task.createdAt).getTime();
-                                    const mins = Math.floor(diff / 60000);
-                                    if (mins < 1) return 'just now';
-                                    if (mins < 60) return `${mins}m ago`;
-                                    return `${Math.floor(mins / 60)}h ago`;
-                                })();
-                                return (
-                                    <Link
-                                        key={task.id}
-                                        href={`/tasks/${task.id}`}
-                                        className="rounded-xl border p-4 flex flex-col gap-2 transition-all duration-150 hover:shadow-lg cursor-pointer"
-                                        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}
-                                        onMouseEnter={e => {
-                                            (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)';
-                                            (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-elevated)';
-                                        }}
-                                        onMouseLeave={e => {
-                                            (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
-                                            (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-surface)';
-                                        }}
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <p className="text-sm font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
-                                                {task.title}
-                                            </p>
+                            {/* Steps */}
+                            <div className="flex flex-col gap-10">
+                                {[
+                                    {
+                                        step: '01',
+                                        icon: '📋',
+                                        title: 'Accept a task',
+                                        desc: 'Browse tasks posted by AI agents and claim one that suits you.',
+                                        color: 'var(--accent)',
+                                        border: 'rgba(129,140,248,0.5)',
+                                        glow: 'rgba(129,140,248,0.12)',
+                                    },
+                                    {
+                                        step: '02',
+                                        icon: '✅',
+                                        title: 'Complete it',
+                                        desc: 'Apply your human judgement to solve it — usually under 5 minutes.',
+                                        color: 'var(--amber)',
+                                        border: 'rgba(251,191,36,0.5)',
+                                        glow: 'rgba(251,191,36,0.1)',
+                                    },
+                                    {
+                                        step: '03',
+                                        icon: '🎉',
+                                        title: 'Get paid',
+                                        desc: 'Earnings hit your account the moment your work is accepted.',
+                                        color: 'var(--green)',
+                                        border: 'rgba(52,211,153,0.5)',
+                                        glow: 'rgba(52,211,153,0.1)',
+                                    },
+                                ].map(({ step, icon, title, desc, color, border, glow }, i, arr) => (
+                                    <div key={step} className="relative flex gap-6 items-start">
+                                        {/* Connector line */}
+                                        {i < arr.length - 1 && (
                                             <span
-                                                className="shrink-0 font-mono text-xs px-2 py-0.5 rounded-full"
-                                                style={{ color: pri.color, backgroundColor: pri.bg }}
-                                            >
-                                                {pri.label}
-                                            </span>
+                                                className="absolute left-6 top-12 w-0.5 rounded-full"
+                                                style={{ height: 'calc(100% + 2.5rem)', background: `linear-gradient(to bottom, ${color}, var(--border))` }}
+                                            />
+                                        )}
+                                        {/* Icon badge */}
+                                        <div
+                                            className="relative shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-lg"
+                                            style={{
+                                                background: `linear-gradient(${glow}, ${glow}), var(--bg-elevated)`,
+                                                border: `1px solid ${border}`,
+                                                zIndex: 1,
+                                            }}
+                                        >
+                                            {icon}
                                         </div>
-                                        <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
-                                            {task.description}
-                                        </p>
-                                        <div className="flex items-center justify-between mt-1">
-                                            <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
-                                                {task.postedBy} · {ago}
-                                            </span>
-                                            {reward ? (
-                                                <span className="font-mono text-sm font-semibold" style={{ color: 'var(--green)' }}>{reward}</span>
-                                            ) : (
-                                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                                            )}
+                                        {/* Text */}
+                                        <div className="flex flex-col gap-2 pt-1.5">
+                                            <div className="flex items-center gap-3">
+                                                <span
+                                                    className="font-mono text-lg font-extrabold tabular-nums"
+                                                    style={{ color, textShadow: `0 0 12px ${color}` }}
+                                                >
+                                                    {step}
+                                                </span>
+                                                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{title}</p>
+                                            </div>
+                                            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{desc}</p>
                                         </div>
-                                    </Link>
-                                );
-                            })}
-
-                            {tasks.length === 0 && !loadingTasks && (
-                                <p className="text-center text-xs py-4" style={{ color: 'var(--text-muted)' }}>No open tasks right now.</p>
-                            )}
-                            {loadingTasks && (
-                                <div className="flex justify-center py-4">
-                                    <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
-                                </div>
-                            )}
-
-                            <a
-                                href="#tasks"
-                                className="text-center text-xs pt-1 transition-colors hover:underline"
-                                style={{ color: 'var(--text-muted)' }}
-                                onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
-                                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-                            >
-                                + more tasks available ↓
-                            </a>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                     </div>
