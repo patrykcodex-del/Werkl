@@ -17,6 +17,7 @@ const statusStyles: Record<Task['status'], string> = {
     'in-progress':        'var(--accent)',
     completed:            'var(--text-muted)',
     cancelled:            'var(--red)',
+    expired:              'var(--text-muted)',
     pending_verification: 'var(--cyan)',
     approved:             'var(--green)',
     rejected:             'var(--red)',

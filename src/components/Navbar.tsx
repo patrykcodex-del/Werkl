@@ -94,7 +94,7 @@ const Navbar: React.FC = () => {
                                     width={28}
                                     height={28}
                                     className="rounded-full ring-1"
-                                    style={{ ringColor: 'var(--border)' }}
+                                    style={{ ['--tw-ring-color' as string]: 'var(--border)' }}
                                 />
                             )}
                             <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>

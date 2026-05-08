@@ -16,7 +16,7 @@ const useTasks = () => {
                 const data = await response.json();
                 setTasks(data);
             } catch (err) {
-                setError(err.message);
+                setError(err instanceof Error ? err.message : 'Unknown error');
             } finally {
                 setLoading(false);
             }

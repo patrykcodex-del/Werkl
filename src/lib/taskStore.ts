@@ -67,11 +67,12 @@ function toPrismaStatus(status: TaskStatus) {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export type TaskSortField = 'createdAt' | 'reward';
+export type TaskSortField = 'createdAt' | 'reward' | 'priority';
 export type TaskSortOrder = 'asc' | 'desc';
 
 export interface ListTasksOptions {
     status?: TaskStatus | TaskStatus[];
+    priority?: TaskPriority;
     sort?: TaskSortField;
     order?: TaskSortOrder;
     limit?: number;
@@ -94,7 +95,7 @@ export async function listTasks(options?: TaskStatus | ListTasksOptions): Promis
             ? { status: options }
             : options;
 
-    const { status, sort = 'createdAt', order = 'desc' } = opts;
+    const { status, priority, sort = 'createdAt', order = 'desc' } = opts;
 
     const statusFilter = status
         ? Array.isArray(status)
@@ -104,6 +105,8 @@ export async function listTasks(options?: TaskStatus | ListTasksOptions): Promis
 
     const orderBy: object = sort === 'reward'
         ? { rewardAmount: order }
+        : sort === 'priority'
+        ? { rewardAmount: order } // fetch by reward as proxy; re-sort in memory below
         : { createdAt: order };
 
     const rows = await prisma.task.findMany({
@@ -113,7 +116,16 @@ export async function listTasks(options?: TaskStatus | ListTasksOptions): Promis
         orderBy,
     });
 
-    return rows.map(toTask);
+    const priorityRank: Record<string, number> = { urgent: 3, high: 2, medium: 1, low: 0 };
+    let tasks = rows.map(toTask);
+    if (sort === 'priority') {
+        tasks = tasks.sort((a, b) =>
+            order === 'desc'
+                ? priorityRank[b.priority] - priorityRank[a.priority]
+                : priorityRank[a.priority] - priorityRank[b.priority]
+        );
+    }
+    return priority ? tasks.filter(t => t.priority === priority) : tasks;
 }
 
 export async function listTasksPaged(options: ListTasksOptions): Promise<TaskPage> {

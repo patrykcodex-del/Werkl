@@ -101,7 +101,6 @@ export default function EarningsPage() {
                             style={{
                                 borderColor: 'var(--border)',
                                 color: 'var(--text-primary)',
-                                focusRingColor: 'var(--accent)',
                             }}
                         />
                         <button
