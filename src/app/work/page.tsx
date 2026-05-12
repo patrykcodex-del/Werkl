@@ -14,7 +14,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import type { Task, TaskPriority, WorkerSession, TaskOffer } from '../../types';
+import type { Task, TaskPriority, WorkerSession, TaskOffer, ReleaseReason } from '../../types';
+import { RELEASE_REASON_LABELS } from '../../types';
 import { useCountdown } from '../../hooks/useCountdown';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -53,9 +54,9 @@ function useSecondsLeft(expiresAt: string | undefined): number {
 
 function StatusBadge({ status }: { status: WorkerSession['status'] }) {
     const cfg: Record<WorkerSession['status'], { label: string; color: string; bg: string }> = {
-        active: { label: '● Active', color: 'var(--green)',      bg: 'rgba(34,197,94,0.1)'  },
-        paused: { label: '⏸ Paused', color: 'var(--amber)',      bg: 'rgba(251,191,36,0.1)' },
-        ended:  { label: '◼ Ended',  color: 'var(--text-muted)', bg: 'rgba(71,85,105,0.15)' },
+        active: { label: '● Receiving tasks', color: 'var(--green)',      bg: 'rgba(34,197,94,0.1)'  },
+        paused: { label: '⏸ Not receiving',   color: 'var(--amber)',      bg: 'rgba(251,191,36,0.1)' },
+        ended:  { label: '◼ Ended',            color: 'var(--text-muted)', bg: 'rgba(71,85,105,0.15)' },
     };
     const c = cfg[status];
     return (
@@ -73,6 +74,43 @@ function StatPill({ label, value }: { label: string; value: number }) {
             <span className="font-mono text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{value}</span>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</span>
         </div>
+    );
+}
+
+function StatCard({ icon, label, value, color, bg }: { icon: string; label: string; value: number; color: string; bg: string }) {
+    return (
+        <div className="flex flex-col gap-1.5 rounded-xl p-3"
+            style={{ backgroundColor: bg, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div className="flex items-center justify-between">
+                <span className="text-sm">{icon}</span>
+                <span className="font-mono text-xl font-bold tabular-nums" style={{ color }}>{value}</span>
+            </div>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
+        </div>
+    );
+}
+
+function SessionDuration({ startedAt }: { startedAt: string }) {
+    const [elapsed, setElapsed] = useState('');
+    useEffect(() => {
+        function tick() {
+            const secs = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+            const h = Math.floor(secs / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            const s = secs % 60;
+            setElapsed(h > 0
+                ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+                : `${m}:${String(s).padStart(2, '0')}`);
+        }
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [startedAt]);
+    return (
+        <span className="font-mono text-xs tabular-nums px-2 py-1 rounded-lg"
+            style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+            ⏱ {elapsed}
+        </span>
     );
 }
 
@@ -582,68 +620,354 @@ function TaskStream({ active, offeredTask, offerExpiresAt, dismissTaskId }: Task
 
 // ─── ActiveTasksPanel ─────────────────────────────────────────────────────────
 
-function ActiveTaskRow({ task }: { task: Task }) {
+// Grace window in seconds — must match server config in releaseTask.ts
+const RELEASE_GRACE_SECS = 30;
+
+function ActiveTaskExpandableRow({
+    task,
+    expanded,
+    onToggle,
+    onTaskUpdate,
+}: {
+    task: Task;
+    expanded: boolean;
+    onToggle: () => void;
+    onTaskUpdate: (updated: Task) => void;
+}) {
     const deadline = task.completionDeadline ?? task.claimExpiresAt;
     const secsLeft = useSecondsLeft(deadline);
     const totalSecs = task.completionMins
         ? task.completionMins * 60
         : task.claimTimeoutMins * 60;
     const pct = deadline ? Math.max(0, Math.min(100, (secsLeft / totalSecs) * 100)) : 100;
-
     const urgent = secsLeft > 0 && secsLeft < 120;
     const barColor = secsLeft === 0 ? 'var(--text-muted)' : urgent ? 'var(--red)' : 'var(--green)';
-
     const mins = Math.floor(secsLeft / 60);
     const secs = secsLeft % 60;
-    const timeStr = secsLeft > 0
-        ? `${mins}:${String(secs).padStart(2, '0')} left`
-        : 'Expired';
+    const timeStr = secsLeft > 0 ? `${mins}:${String(secs).padStart(2, '0')} left` : 'Expired';
+
+    // Grace window countdown
+    const [graceSecsLeft, setGraceSecsLeft] = useState<number | null>(null);
+    useEffect(() => {
+        if (!task.claimedAt) { setGraceSecsLeft(null); return; }
+        const graceEndsMs = new Date(task.claimedAt).getTime() + RELEASE_GRACE_SECS * 1000;
+        function tick() { setGraceSecsLeft(Math.max(0, Math.ceil((graceEndsMs - Date.now()) / 1000))); }
+        tick();
+        const id = setInterval(tick, 500);
+        return () => clearInterval(id);
+    }, [task.claimedAt]);
+
+    // Action state
+    const [result, setResult]                     = useState('');
+    const [submitting, setSubmitting]             = useState(false);
+    const [releasing, setReleasing]               = useState(false);
+    const [releaseReason, setReleaseReason]       = useState<ReleaseReason | ''>('');
+    const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
+
+    const deadlineCountdown = useCountdown(deadline ?? undefined);
+
+    async function handleSubmitResult() {
+        if (!result.trim()) return;
+        setSubmitting(true);
+        const res = await fetch(`/api/tasks/${task.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'pending_verification', result }),
+        });
+        if (res.ok) onTaskUpdate(await res.json());
+        setSubmitting(false);
+    }
+
+    async function handleRelease() {
+        setReleasing(true);
+        setShowReleaseConfirm(false);
+        try {
+            const res = await fetch(`/api/tasks/${task.id}/release`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(releaseReason ? { reason: releaseReason } : {}),
+            });
+            if (res.ok) {
+                // Reload page so session + active tasks refresh
+                window.location.reload();
+            } else {
+                const data = await res.json();
+                alert(data.error ?? 'Could not release task.');
+                setReleasing(false);
+            }
+        } catch {
+            alert('Network error — could not release task.');
+            setReleasing(false);
+        }
+    }
+
+    const isActionable = task.status === 'claimed';
 
     return (
-        <a href={`/tasks/${task.id}`}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group"
-            style={{ backgroundColor: 'var(--bg-elevated)' }}>
-            {/* Priority dot */}
-            <span className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: PRIORITY_COLOR[task.priority] }} />
+        <div className="rounded-xl overflow-hidden border transition-colors"
+            style={{
+                borderColor: expanded ? 'var(--accent)' : 'var(--border)',
+                backgroundColor: 'var(--bg-elevated)',
+            }}>
 
-            {/* Title + deadline bar */}
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate group-hover:underline"
-                    style={{ color: 'var(--text-primary)' }}>
-                    {task.title}
-                </p>
-                {deadline && (
-                    <div className="mt-1 flex items-center gap-2">
-                        <div className="flex-1 h-1 rounded-full overflow-hidden"
-                            style={{ backgroundColor: 'var(--border)' }}>
-                            <div className="h-full rounded-full transition-all duration-1000"
-                                style={{ width: `${pct}%`, backgroundColor: barColor }} />
+            {/* ── Header row (always visible) ── */}
+            <button
+                onClick={onToggle}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+                style={{ backgroundColor: 'transparent' }}
+            >
+                {/* Priority dot */}
+                <span className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: PRIORITY_COLOR[task.priority] }} />
+
+                {/* Title + deadline bar */}
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate"
+                        style={{ color: 'var(--text-primary)' }}>
+                        {task.title}
+                    </p>
+                    {deadline && (
+                        <div className="mt-1 flex items-center gap-2">
+                            <div className="flex-1 h-1 rounded-full overflow-hidden"
+                                style={{ backgroundColor: 'var(--border)' }}>
+                                <div className="h-full rounded-full transition-all duration-1000"
+                                    style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                            </div>
+                            <span className="text-xs font-mono flex-shrink-0"
+                                style={{ color: urgent ? 'var(--red)' : 'var(--text-muted)' }}>
+                                {timeStr}
+                            </span>
                         </div>
-                        <span className="text-xs font-mono flex-shrink-0"
-                            style={{ color: urgent ? 'var(--red)' : 'var(--text-muted)' }}>
-                            {timeStr}
-                        </span>
-                    </div>
+                    )}
+                </div>
+
+                {/* Reward */}
+                {task.reward && (
+                    <span className="text-xs font-semibold flex-shrink-0"
+                        style={{ color: 'var(--green)' }}>
+                        {task.reward.currency}{task.reward.amount.toFixed(2)}
+                    </span>
                 )}
-            </div>
 
-            {/* Reward */}
-            {task.reward && (
-                <span className="text-xs font-semibold flex-shrink-0"
-                    style={{ color: 'var(--green)' }}>
-                    {task.reward.currency}{task.reward.amount.toFixed(2)}
+                {/* Expand chevron */}
+                <span className="text-xs flex-shrink-0 transition-transform duration-200"
+                    style={{
+                        color: 'var(--text-muted)',
+                        transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}>
+                    ›
                 </span>
-            )}
+            </button>
 
-            {/* Arrow */}
-            <span className="text-xs opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                style={{ color: 'var(--text-primary)' }}>→</span>
-        </a>
+            {/* ── Expanded detail ── */}
+            {expanded && (
+                <div className="px-4 pb-4 pt-1 space-y-4 border-t" style={{ borderColor: 'var(--border)' }}>
+
+                    {/* Description */}
+                    {task.description && (
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            {task.description}
+                        </p>
+                    )}
+
+                    {/* Context */}
+                    {task.context && (
+                        <div className="rounded-lg border p-3 space-y-1"
+                            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+                            <p className="text-xs font-semibold uppercase tracking-wider mb-1"
+                                style={{ color: 'var(--text-muted)' }}>
+                                Context from agent
+                            </p>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap"
+                                style={{ color: 'var(--text-secondary)' }}>
+                                {task.context}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Deadline countdown */}
+                    {isActionable && deadlineCountdown && (
+                        <div className="flex items-center gap-2 text-sm rounded-lg border px-3 py-2"
+                            style={{
+                                borderColor: deadlineCountdown === 'Expired' ? 'rgba(248,113,113,0.3)' : 'rgba(251,191,36,0.3)',
+                                backgroundColor: deadlineCountdown === 'Expired' ? 'rgba(248,113,113,0.05)' : 'rgba(251,191,36,0.05)',
+                                color: deadlineCountdown === 'Expired' ? 'var(--red)' : 'var(--amber)',
+                            }}>
+                            <span>⚡</span>
+                            <span>Submit within <strong>{deadlineCountdown}</strong> or this task will be reassigned</span>
+                        </div>
+                    )}
+
+                    {/* ── Submit result ── */}
+                    {isActionable && (
+                        <div className="space-y-2">
+                            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                Submit your result
+                            </p>
+                            <textarea
+                                value={result}
+                                onChange={(e) => setResult(e.target.value)}
+                                placeholder="Enter your response or findings here…"
+                                rows={4}
+                                className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:ring-1 resize-y"
+                                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                            />
+                            <button
+                                onClick={handleSubmitResult}
+                                disabled={submitting || !result.trim()}
+                                className="w-full py-2.5 text-sm font-semibold rounded-lg border transition-colors hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+                                style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                            >
+                                {submitting ? 'Submitting…' : 'Submit for verification'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ── Release section ── */}
+                    {isActionable && (
+                        <div className="pt-2 border-t space-y-2" style={{ borderColor: 'var(--border-dim)' }}>
+                            {/* Grace banner */}
+                            {graceSecsLeft !== null && graceSecsLeft > 0 && (
+                                <div className="flex items-center gap-2 rounded-lg border px-3 py-2"
+                                    style={{ borderColor: 'rgba(52,211,153,0.25)', backgroundColor: 'rgba(52,211,153,0.05)' }}>
+                                    <p className="text-xs" style={{ color: 'var(--green)' }}>
+                                        ✓ No penalty release available for the next <strong>{graceSecsLeft}s</strong>.
+                                    </p>
+                                </div>
+                            )}
+                            {graceSecsLeft === 0 && (
+                                <div className="flex items-center gap-2 rounded-lg border px-3 py-2"
+                                    style={{ borderColor: 'rgba(251,191,36,0.3)', backgroundColor: 'rgba(251,191,36,0.05)' }}>
+                                    <span>⚠️</span>
+                                    <p className="text-xs" style={{ color: 'var(--amber)' }}>
+                                        Releasing now will affect your reliability score.
+                                    </p>
+                                </div>
+                            )}
+
+                            {showReleaseConfirm ? (
+                                <div className="rounded-lg border p-3 space-y-3"
+                                    style={{ borderColor: 'rgba(248,113,113,0.3)', backgroundColor: 'rgba(248,113,113,0.04)' }}>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--red)' }}>
+                                        Release this task?
+                                    </p>
+                                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                        The task will return to the queue and your reliability score will be reduced.
+                                    </p>
+                                    <select
+                                        value={releaseReason}
+                                        onChange={(e) => setReleaseReason(e.target.value as ReleaseReason | '')}
+                                        className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm focus:outline-none"
+                                        style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                                    >
+                                        <option value="">Reason (optional)</option>
+                                        {(Object.entries(RELEASE_REASON_LABELS) as [ReleaseReason, string][]).map(([k, v]) => (
+                                            <option key={k} value={k}>{v}</option>
+                                        ))}
+                                    </select>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleRelease}
+                                            disabled={releasing}
+                                            className="flex-1 py-2 text-sm font-semibold rounded-lg disabled:opacity-50"
+                                            style={{ backgroundColor: 'var(--red)', color: '#fff' }}
+                                        >
+                                            {releasing ? 'Releasing…' : 'Confirm release'}
+                                        </button>
+                                        <button
+                                            onClick={() => setShowReleaseConfirm(false)}
+                                            disabled={releasing}
+                                            className="flex-1 py-2 text-sm rounded-lg border hover:bg-white/5 disabled:opacity-50"
+                                            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                                        >
+                                            Keep task
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        if (graceSecsLeft && graceSecsLeft > 0) {
+                                            handleRelease();
+                                        } else {
+                                            setShowReleaseConfirm(true);
+                                        }
+                                    }}
+                                    disabled={releasing}
+                                    className="w-full py-2 text-sm rounded-lg border transition-colors hover:bg-white/5 disabled:opacity-50"
+                                    style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+                                >
+                                    {releasing ? 'Releasing…' : 'Release back to queue'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Pending verification */}
+                    {task.status === 'pending_verification' && (
+                        <div className="rounded-lg border p-3 space-y-1"
+                            style={{ borderColor: 'rgba(129,140,248,0.3)', backgroundColor: 'rgba(129,140,248,0.05)' }}>
+                            <div className="flex items-center gap-2 font-semibold text-sm" style={{ color: 'var(--accent)' }}>
+                                <span>⏳</span><span>Awaiting agent verification</span>
+                            </div>
+                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                Your result has been submitted. The AI agent will review it shortly.
+                            </p>
+                            {task.result && (
+                                <div className="rounded border p-2 text-sm mt-1"
+                                    style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)', color: 'var(--text-secondary)' }}>
+                                    <p className="font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Your submission:</p>
+                                    <p className="whitespace-pre-wrap">{task.result}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Approved */}
+                    {task.status === 'approved' && (
+                        <div className="rounded-lg border p-3 space-y-1"
+                            style={{ borderColor: 'rgba(52,211,153,0.3)', backgroundColor: 'rgba(52,211,153,0.05)' }}>
+                            <div className="flex items-center gap-2 font-semibold text-sm" style={{ color: 'var(--green)' }}>
+                                <span>✓</span>
+                                <span>Approved!{task.reward && ` ${new Intl.NumberFormat('en-US', { style: 'currency', currency: task.reward.currency }).format(task.reward.amount)} added to your balance.`}</span>
+                            </div>
+                            {task.verificationNote && (
+                                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>Note: </span>
+                                    {task.verificationNote}
+                                </p>
+                            )}
+                            <a href="/earnings"
+                                className="inline-block mt-1 px-3 py-1.5 text-xs font-semibold rounded-lg"
+                                style={{ backgroundColor: 'var(--green)', color: '#000' }}>
+                                View earnings →
+                            </a>
+                        </div>
+                    )}
+
+                    {/* Rejected */}
+                    {task.status === 'rejected' && (
+                        <div className="rounded-lg border p-3 space-y-1"
+                            style={{ borderColor: 'rgba(248,113,113,0.3)', backgroundColor: 'rgba(248,113,113,0.05)' }}>
+                            <div className="flex items-center gap-2 font-semibold text-sm" style={{ color: 'var(--red)' }}>
+                                <span>✕</span><span>Result not accepted</span>
+                            </div>
+                            {task.verificationNote && (
+                                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>Feedback: </span>
+                                    {task.verificationNote}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }
 
-function ActiveTasksPanel({ tasks }: { tasks: Task[] }) {
+function ActiveTasksPanel({ tasks, onTaskUpdate }: { tasks: Task[]; onTaskUpdate: (updated: Task) => void }) {
+    const [expandedId, setExpandedId] = useState<string | null>(null);
     if (tasks.length === 0) return null;
     const atCapacity = tasks.length >= CONCURRENCY_LIMIT;
     return (
@@ -671,13 +995,21 @@ function ActiveTasksPanel({ tasks }: { tasks: Task[] }) {
                 </span>
             </div>
             <div className="p-2 space-y-1">
-                {tasks.map((t) => <ActiveTaskRow key={t.id} task={t} />)}
+                {tasks.map((t) => (
+                    <ActiveTaskExpandableRow
+                        key={t.id}
+                        task={t}
+                        expanded={expandedId === t.id}
+                        onToggle={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                        onTaskUpdate={onTaskUpdate}
+                    />
+                ))}
             </div>
             <div className="px-4 py-2.5 border-t" style={{ borderColor: 'var(--border)' }}>
                 <p className="text-xs" style={{ color: atCapacity ? 'var(--yellow, #eab308)' : 'var(--text-muted)' }}>
                     {atCapacity
                         ? 'Complete or submit a task above to unlock your next offer.'
-                        : `Click any task to continue working on it. You can hold up to ${CONCURRENCY_LIMIT} tasks at once.`}
+                        : `Click a task to expand it and submit your result. You can hold up to ${CONCURRENCY_LIMIT} tasks at once.`}
                 </p>
             </div>
         </div>
@@ -711,8 +1043,8 @@ function HistoryRow({ task }: { task: HistoryTask }) {
     });
 
     return (
-        <a href={`/tasks/${task.id}`}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group"
+        <div
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
             style={{ backgroundColor: 'var(--bg-elevated)' }}>
 
             {/* Status icon */}
@@ -723,7 +1055,7 @@ function HistoryRow({ task }: { task: HistoryTask }) {
 
             {/* Title + date */}
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate group-hover:underline"
+                <p className="text-sm font-medium truncate"
                     style={{ color: 'var(--text-primary)' }}>
                     {task.title}
                 </p>
@@ -747,9 +1079,9 @@ function HistoryRow({ task }: { task: HistoryTask }) {
                 </div>
             )}
 
-            <span className="text-xs opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                style={{ color: 'var(--text-primary)' }}>→</span>
-        </a>
+            <span className="text-xs opacity-40 flex-shrink-0"
+                style={{ color: 'var(--text-muted)' }}>·</span>
+        </div>
     );
 }
 
@@ -1114,52 +1446,163 @@ export default function WorkPage() {
                 <div className="space-y-5">
 
                     {/* Session card */}
-                    <div className="rounded-2xl border p-5 space-y-4"
-                        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-surface)' }}>
+                    <div className="rounded-2xl border overflow-hidden"
+                        style={{
+                            borderColor: isActive ? 'var(--green)' : 'var(--border)',
+                            backgroundColor: 'var(--bg-surface)',
+                        }}>
 
-                        <div className="flex items-center justify-between gap-3">
-                            {/* Stats */}
-                            <div>
-                                {workerSession && (
-                                    <div className="flex gap-3">
-                                        <StatPill label="Accepted" value={workerSession.acceptedCount} />
-                                        <StatPill label="Skipped"  value={workerSession.skippedCount} />
-                                        <StatPill label="Expired"  value={workerSession.expiredOfferCount} />
-                                    </div>
-                                )}
-                            </div>
+                        {/* Top status bar */}
+                        <div className="flex items-center gap-2.5 px-5 py-3 border-b"
+                            style={{
+                                borderColor: isActive ? 'rgba(34,197,94,0.25)' : 'var(--border)',
+                                backgroundColor: isActive
+                                    ? 'rgba(34,197,94,0.06)'
+                                    : isPaused
+                                    ? 'rgba(251,191,36,0.04)'
+                                    : 'var(--bg-elevated)',
+                            }}>
+                            {/* Status indicator */}
+                            {isActive ? (
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-50"
+                                        style={{ backgroundColor: 'var(--accent)' }} />
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5"
+                                        style={{ backgroundColor: 'var(--accent)' }} />
+                                </span>
+                            ) : isPaused ? (
+                                <span className="w-2.5 h-2.5 rounded-full"
+                                    style={{ backgroundColor: 'var(--amber)' }} />
+                            ) : (
+                                <span className="w-2.5 h-2.5 rounded-full"
+                                    style={{ backgroundColor: 'var(--text-muted)' }} />
+                            )}
+                            <p className="text-sm font-semibold"
+                                style={{
+                                    color: isActive ? 'var(--accent)' : isPaused ? 'var(--amber)' : 'var(--text-muted)',
+                                }}>
+                                {isActive ? 'Receiving tasks' : isPaused ? 'Not receiving tasks' : 'No active session'}
+                            </p>
+                        </div>
 
-                            {/* Session buttons — only Pause / Resume */}
-                            <div className="flex gap-2 shrink-0">
-                                {isActive ? (
-                                    <button onClick={handlePauseSession} disabled={actionLoading}
-                                        className="px-3 py-2 rounded-xl text-sm border transition-all disabled:opacity-50"
-                                        style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
-                                        Pause
-                                    </button>
+                        {/* Stats + status body */}
+                        <div className="px-5 py-4 space-y-4">
+                            {/* Stat row */}
+                            {workerSession && (
+                                <div className="grid grid-cols-3 gap-3">
+                                    <StatCard
+                                        icon="✓"
+                                        label="Accepted"
+                                        value={workerSession.acceptedCount}
+                                        color="var(--green)"
+                                        bg="rgba(34,197,94,0.07)"
+                                    />
+                                    <StatCard
+                                        icon="›"
+                                        label="Skipped"
+                                        value={workerSession.skippedCount}
+                                        color="var(--amber)"
+                                        bg="rgba(251,191,36,0.07)"
+                                    />
+                                    <StatCard
+                                        icon="⏱"
+                                        label="Expired"
+                                        value={workerSession.expiredOfferCount}
+                                        color="var(--red)"
+                                        bg="rgba(248,113,113,0.07)"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Status message row */}
+                            <div className="flex items-center gap-3 rounded-xl px-4 py-3"
+                                style={{ backgroundColor: 'var(--bg-elevated)' }}>
+                                {isActive && offer ? (
+                                    <>
+                                        <span className="text-base">📬</span>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                                New task offered
+                                            </p>
+                                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                                Review and accept before the timer runs out
+                                            </p>
+                                        </div>
+                                    </>
+                                ) : isActive && activeTasks.length >= CONCURRENCY_LIMIT ? (
+                                    <>
+                                        <span className="text-base">⚠️</span>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-semibold" style={{ color: 'var(--amber)' }}>
+                                                Queue full ({activeTasks.length}/{CONCURRENCY_LIMIT})
+                                            </p>
+                                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                                Submit or release a task to receive new offers
+                                            </p>
+                                        </div>
+                                    </>
+                                ) : isActive ? (
+                                    <>
+                                        <div className="flex gap-1">
+                                            {[0, 150, 300].map((delay) => (
+                                                <div key={delay} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                                                    style={{ backgroundColor: 'var(--accent)', animationDelay: `${delay}ms` }} />
+                                            ))}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                                Scanning for tasks…
+                                            </p>
+                                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                                You'll be notified as soon as one is routed to you
+                                            </p>
+                                        </div>
+                                    </>
                                 ) : isPaused ? (
-                                    <button onClick={handleResumeSession} disabled={actionLoading}
-                                        className="px-4 py-2 rounded-xl font-semibold text-sm transition-all disabled:opacity-50"
-                                        style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
-                                        {actionLoading ? 'Resuming…' : 'Resume'}
-                                    </button>
-                                ) : null}
+                                    <>
+                                        <span className="text-base">⏸</span>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                                Not receiving tasks
+                                            </p>
+                                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                                Hit "Send me tasks" when you're ready to pick up more work
+                                            </p>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-base">💤</span>
+                                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                                            No active session
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </div>
 
-                        {/* Status label */}
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{statusLabel}</p>
-
-                        {/* Animated waiting dots — only while active and scanning */}
-                        {isActive && !offer && activeTasks.length < CONCURRENCY_LIMIT && (
-                            <div className="flex items-center gap-2 py-1">
-                                {[0, 150, 300].map((delay) => (
-                                    <div key={delay} className="w-2 h-2 rounded-full animate-bounce bg-indigo-400"
-                                        style={{ animationDelay: `${delay}ms` }} />
-                                ))}
-                                <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>
-                                    Scanning for the next best task for you…
-                                </span>
+                        {/* Primary CTA — full-width at bottom of card */}
+                        {(isActive || isPaused) && (
+                            <div className="px-5 pb-5">
+                                {isActive ? (
+                                    <button
+                                        onClick={handlePauseSession}
+                                        disabled={actionLoading}
+                                        className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                                        style={{ backgroundColor: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.3)' }}
+                                    >
+                                        Stop sending me tasks
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleResumeSession}
+                                        disabled={actionLoading}
+                                        className="w-full py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-50"
+                                        style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                                    >
+                                        {actionLoading ? 'Starting…' : 'Send me tasks'}
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1176,7 +1619,12 @@ export default function WorkPage() {
                     )}
 
                     {/* Active tasks panel */}
-                    <ActiveTasksPanel tasks={activeTasks} />
+                    <ActiveTasksPanel
+                        tasks={activeTasks}
+                        onTaskUpdate={(updated) =>
+                            setActiveTasks((prev) => prev.map((t) => t.id === updated.id ? updated : t))
+                        }
+                    />
 
                     {/* Session history — completed and missed tasks */}
                     <SessionHistoryPanel />
