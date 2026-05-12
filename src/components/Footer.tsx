@@ -18,8 +18,6 @@ const Footer = () => {
                 </div>
                 <div className="flex gap-5 text-sm" style={{ color: 'var(--text-muted)' }}>
                     <Link href="/" className="transition-colors hover:text-slate-300" style={{ color: 'inherit' }}>Home</Link>
-                    <Link href="/" className="transition-colors hover:text-slate-300" style={{ color: 'inherit' }}>Tasks</Link>
-                    <Link href="/dashboard" className="transition-colors hover:text-slate-300" style={{ color: 'inherit' }}>Dashboard</Link>
                 </div>
             </div>
         </footer>
