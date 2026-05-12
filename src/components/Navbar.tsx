@@ -69,7 +69,7 @@ const Navbar: React.FC = () => {
 
                 {/* Right controls */}
                 <div className="flex items-center gap-3">
-                    <ThemeToggle />
+                    <span className="hidden sm:block"><ThemeToggle /></span>
                     {session ? (
                         <div className="relative" ref={dropdownRef}>
                             <button

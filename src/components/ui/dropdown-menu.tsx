@@ -11,13 +11,13 @@ const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 const DropdownMenuContent = React.forwardRef<
     React.ElementRef<typeof DropdownMenuPrimitive.Content>,
     React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
+>(({ className, sideOffset = 4, style, ...props }, ref) => (
     <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.Content
             ref={ref}
             sideOffset={sideOffset}
             className={cn(
-                'z-50 min-w-[8rem] overflow-hidden rounded-lg border py-1 shadow-lg',
+                'z-50 min-w-[8rem] overflow-hidden rounded-lg py-1 shadow-lg',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                 'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -26,7 +26,8 @@ const DropdownMenuContent = React.forwardRef<
             )}
             style={{
                 backgroundColor: 'var(--bg-elevated)',
-                borderColor: 'var(--border)',
+                border: '1px solid var(--border)',
+                ...style,
             }}
             {...props}
         />
@@ -37,7 +38,7 @@ DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 const DropdownMenuItem = React.forwardRef<
     React.ElementRef<typeof DropdownMenuPrimitive.Item>,
     React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item>
->(({ className, ...props }, ref) => (
+>(({ className, style, ...props }, ref) => (
     <DropdownMenuPrimitive.Item
         ref={ref}
         className={cn(
@@ -45,7 +46,7 @@ const DropdownMenuItem = React.forwardRef<
             'transition-colors focus:bg-white/5 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
             className,
         )}
-        style={{ color: 'var(--text-secondary)' }}
+        style={{ color: 'var(--text-secondary)', ...style }}
         {...props}
     />
 ));
