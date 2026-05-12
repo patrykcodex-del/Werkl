@@ -36,6 +36,14 @@ export async function POST(_req: NextRequest) {
     const userId = getUserId(session);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const workerSession = await startSession(userId);
-    return NextResponse.json({ session: workerSession }, { status: 201 });
+    try {
+        const workerSession = await startSession(userId);
+        return NextResponse.json({ session: workerSession }, { status: 201 });
+    } catch (err) {
+        console.error('[POST /api/sessions] startSession failed:', err);
+        return NextResponse.json(
+            { error: err instanceof Error ? err.message : 'Internal server error' },
+            { status: 500 }
+        );
+    }
 }

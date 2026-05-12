@@ -2,20 +2,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
 
-const navLinks = [
-    { href: '/work',      label: '⚡ Work' },
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/earnings',  label: 'Earnings' },
-];
-
 const Navbar: React.FC = () => {
-    const [open, setOpen] = useState(false);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
     const [visible, setVisible] = useState(true);
     const lastScrollY = useRef(0);
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const { data: session, status } = useSession();
 
     useEffect(() => {
@@ -30,7 +25,7 @@ const Navbar: React.FC = () => {
             } else if (current > lastScrollY.current + 4) {
                 // Scrolling down (with a small dead-zone) → hide
                 setVisible(false);
-                setOpen(false);
+                setDropdownOpen(false);
             }
             lastScrollY.current = current;
         };
@@ -38,6 +33,16 @@ const Navbar: React.FC = () => {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setDropdownOpen(false);
+            }
+        }
+        if (dropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [dropdownOpen]);
 
     return (
         <nav
@@ -62,119 +67,95 @@ const Navbar: React.FC = () => {
                     </span>
                 </Link>
 
-                {/* Desktop links */}
-                {session && (
-                <ul className="hidden md:flex items-center gap-1">
-                    {navLinks.map(({ href, label }) => (
-                        <li key={href}>
-                            <Link
-                                href={href}
-                                className="px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-white/5"
-                                style={{ color: 'var(--text-secondary)' }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-                            >
-                                {label}
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-                )}
-
-                {/* Desktop auth */}
-                <div className="hidden md:flex items-center gap-3">
+                {/* Right controls */}
+                <div className="flex items-center gap-3">
                     <ThemeToggle />
-                    {status === 'loading' ? (
-                        <div className="w-6 h-6 rounded-full animate-pulse" style={{ backgroundColor: 'var(--border)' }} />
-                    ) : session ? (
-                        <div className="flex items-center gap-3">
-                            {session.user?.image && (
-                                <Image
-                                    src={session.user.image}
-                                    alt={session.user.name ?? 'User'}
-                                    width={28}
-                                    height={28}
-                                    className="rounded-full ring-1"
-                                    style={{ ['--tw-ring-color' as string]: 'var(--border)' }}
-                                />
-                            )}
-                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                {session.user?.name}
-                            </span>
+                    {session ? (
+                        <div className="relative" ref={dropdownRef}>
                             <button
-                                onClick={() => signOut()}
-                                className="text-sm px-3 py-1.5 rounded-md transition-colors hover:bg-red-500/10"
-                                style={{ color: 'var(--red)' }}
+                                onClick={() => setDropdownOpen((v) => !v)}
+                                className="flex items-center justify-center rounded-full ring-2 transition-all focus:outline-none"
+                                style={{
+                                    ['--tw-ring-color' as string]: dropdownOpen ? 'var(--accent)' : 'var(--border)',
+                                }}
+                                aria-label="User menu"
                             >
-                                Sign out
+                                {session.user?.image ? (
+                                    <Image
+                                        src={session.user.image}
+                                        alt={session.user.name ?? 'User'}
+                                        width={32}
+                                        height={32}
+                                        className="rounded-full"
+                                    />
+                                ) : (
+                                    <div
+                                        className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                                        style={{ backgroundColor: 'var(--accent-glow)', color: 'var(--accent)' }}
+                                    >
+                                        {session.user?.name?.[0] ?? '?'}
+                                    </div>
+                                )}
                             </button>
+
+                            {dropdownOpen && (
+                                <div
+                                    className="absolute right-0 mt-2 w-56 rounded-xl border shadow-xl py-1 z-50"
+                                    style={{
+                                        backgroundColor: 'var(--bg-surface)',
+                                        borderColor: 'var(--border)',
+                                        boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+                                    }}
+                                >
+                                    {/* User info */}
+                                    <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+                                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                                            {session.user?.name}
+                                        </p>
+                                        {session.user?.email && (
+                                            <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                                {session.user.email}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Menu items */}
+                                    <div className="py-1">
+                                        <Link
+                                            href="/earnings"
+                                            onClick={() => setDropdownOpen(false)}
+                                            className="flex items-center gap-2.5 px-4 py-2 text-sm transition-colors hover:bg-white/5"
+                                            style={{ color: 'var(--text-secondary)' }}
+                                        >
+                                            <span>💰</span>
+                                            Earnings
+                                        </Link>
+                                    </div>
+
+                                    <div className="border-t py-1" style={{ borderColor: 'var(--border)' }}>
+                                        <button
+                                            onClick={() => { setDropdownOpen(false); signOut(); }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors hover:bg-red-500/10 text-left"
+                                            style={{ color: 'var(--red)' }}
+                                        >
+                                            <span>↩</span>
+                                            Sign out
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <button
-                            onClick={() => signIn('google', {}, { prompt: 'select_account' })}
+                        <Link
+                            href="/auth/signin"
                             className="px-4 py-1.5 text-sm font-medium rounded-md border transition-colors hover:bg-white/5"
                             style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
                         >
                             Sign in
-                        </button>
+                        </Link>
                     )}
                 </div>
-
-                {/* Mobile controls */}
-                <div className="flex md:hidden items-center gap-2">
-                    <ThemeToggle />
-                    <button
-                        className="p-2 rounded-md transition-colors hover:bg-white/5"
-                        style={{ color: 'var(--text-secondary)' }}
-                        onClick={() => setOpen(!open)}
-                        aria-label="Toggle menu"
-                    >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        {open ? (
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        ) : (
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                        )}
-                    </svg>
-                    </button>
-                </div>
             </div>
-
-            {/* Mobile menu */}
-            {open && (
-                <div className="md:hidden border-t" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-                    <ul className="flex flex-col px-4 py-3 gap-1">
-                        {session && navLinks.map(({ href, label }) => (
-                            <li key={href}>
-                                <Link
-                                    href={href}
-                                    className="block py-2 text-sm transition-colors"
-                                    style={{ color: 'var(--text-secondary)' }}
-                                    onClick={() => setOpen(false)}
-                                >
-                                    {label}
-                                </Link>
-                            </li>
-                        ))}
-                        <li className="pt-3 border-t mt-1" style={{ borderColor: 'var(--border)' }}>
-                            {session ? (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{session.user?.name}</span>
-                                    <button onClick={() => signOut()} className="text-sm" style={{ color: 'var(--red)' }}>Sign out</button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => signIn('google', {}, { prompt: 'select_account' })}
-                                    className="w-full px-4 py-2 text-sm font-medium rounded-md border transition-colors hover:bg-white/5"
-                                    style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                                >
-                                    Sign in with Google
-                                </button>
-                            )}
-                        </li>
-                    </ul>
-                </div>
-            )}
         </nav>
     );
 };

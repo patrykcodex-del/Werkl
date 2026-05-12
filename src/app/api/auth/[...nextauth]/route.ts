@@ -11,11 +11,17 @@ export const authOptions: NextAuthOptions = {
     ],
     pages: {
         signIn: '/auth/signin',
+        error: '/auth/signin',
     },
     callbacks: {
         async session({ session, token }) {
-            if (session.user && token.sub) {
-                (session.user as typeof session.user & { id: string }).id = token.sub;
+            try {
+                if (session.user && token.sub) {
+                    (session.user as typeof session.user & { id: string }).id = token.sub;
+                }
+            } catch {
+                // swallow – fall back to an anonymous session
+                return { ...session, user: undefined, expires: session.expires };
             }
             return session;
         },
