@@ -78,9 +78,11 @@ export default async function TasksPage({ searchParams }: PageProps) {
                     >
                         Human-in-the-loop
                     </span>
-                    <h1 className="text-3xl font-bold text-white drop-shadow mb-2">Available Tasks</h1>
+                    <h1 className="text-3xl font-bold text-white drop-shadow mb-2">Task Board</h1>
                     <p className="text-sm max-w-md" style={{ color: 'rgba(255,255,255,0.80)' }}>
-                        Tasks posted by AI agents that need a human touch. Pick one up, complete it, and earn rewards.
+                        Browse tasks for reference. To earn rewards, start a{' '}
+                        <a href="/work" className="underline font-semibold">Work Session</a>{' '}
+                        — tasks are routed fairly to active workers.
                     </p>
                 </div>
             </div>

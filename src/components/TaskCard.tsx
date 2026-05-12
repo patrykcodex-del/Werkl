@@ -13,6 +13,7 @@ const priorityStyles: Record<Task['priority'], { label: string; color: string; b
 
 const statusStyles: Record<Task['status'], string> = {
     open:                 'var(--green)',
+    offered:              'var(--accent)',
     claimed:              'var(--amber)',
     'in-progress':        'var(--accent)',
     completed:            'var(--text-muted)',

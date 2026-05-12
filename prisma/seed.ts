@@ -154,8 +154,91 @@ async function main() {
 
     const count = await prisma.task.count();
     console.log(`✅ Seed complete — ${count} tasks in database.`);
-}
 
+    // ── Live-feed demo tasks (staggered recent timestamps) ────────────────────
+    // These simulate tasks rolling in over the last 10 minutes so the homepage
+    // live feed looks active during local development. They are deleted and
+    // re-created each run to keep the timestamps fresh.
+    // Delete child rows first to avoid FK constraint violations
+    await prisma.taskOffer.deleteMany({
+        where: { task: { id: { startsWith: 'live-' } } },
+    });
+    await prisma.task.deleteMany({
+        where: { id: { startsWith: 'live-' } },
+    });
+
+    const now = Date.now();
+    const liveTasks = [
+        { id: 'live-1',  secsAgo: 8,    title: 'Label objects in a warehouse photo',                    priority: 'high',   reward: 4    },
+        { id: 'live-2',  secsAgo: 22,   title: 'Rate the sentiment of a product review',                priority: 'medium', reward: 1.5  },
+        { id: 'live-3',  secsAgo: 45,   title: 'Proofread a two-paragraph press release',               priority: 'high',   reward: 6    },
+        { id: 'live-4',  secsAgo: 70,   title: 'Confirm a business phone number is correct',            priority: 'low',    reward: 2    },
+        { id: 'live-5',  secsAgo: 95,   title: 'Flag inappropriate content in a forum post',            priority: 'urgent', reward: 5    },
+        { id: 'live-6',  secsAgo: 130,  title: 'Identify the dominant colour in a brand logo',          priority: 'low',    reward: 1    },
+        { id: 'live-7',  secsAgo: 160,  title: 'Classify a customer support ticket by urgency',         priority: 'high',   reward: 3    },
+        { id: 'live-8',  secsAgo: 200,  title: 'Transcribe a 60-second audio note',                    priority: 'medium', reward: 4    },
+        { id: 'live-9',  secsAgo: 240,  title: 'Is this website currently live and loading correctly?', priority: 'low',    reward: 1.5  },
+        { id: 'live-10', secsAgo: 280,  title: 'Spot the difference between two contract clauses',      priority: 'urgent', reward: 8    },
+        { id: 'live-11', secsAgo: 320,  title: 'Write a one-sentence tagline for a coffee brand',       priority: 'low',    reward: 2    },
+        { id: 'live-12', secsAgo: 370,  title: 'Verify a map pin is placed at the right location',      priority: 'medium', reward: 2    },
+        { id: 'live-13', secsAgo: 420,  title: 'Translate a product description from Spanish to English', priority: 'medium', reward: 3.5 },
+        { id: 'live-14', secsAgo: 480,  title: 'Confirm an IBAN bank number is valid',                  priority: 'low',    reward: 1.5  },
+        { id: 'live-15', secsAgo: 540,  title: 'Identify the breed of dog in a photo',                  priority: 'low',    reward: 1    },
+        { id: 'live-16', secsAgo: 610,  title: 'Check if a discount code is still active',              priority: 'medium', reward: 2.5  },
+        { id: 'live-17', secsAgo: 680,  title: 'Extract all dates from a legal paragraph',              priority: 'medium', reward: 2.5  },
+        { id: 'live-18', secsAgo: 750,  title: 'Grade a short essay on renewable energy out of 10',     priority: 'high',   reward: 7    },
+        { id: 'live-19', secsAgo: 830,  title: 'Rewrite a weak email subject line',                     priority: 'low',    reward: 2    },
+        { id: 'live-20', secsAgo: 910,  title: 'Detect the emotion in a customer complaint email',      priority: 'medium', reward: 2    },
+        { id: 'live-21', secsAgo: 1000, title: 'Verify that a product weight spec matches the listing',  priority: 'medium', reward: 3    },
+        { id: 'live-22', secsAgo: 1100, title: 'Pick the best product photo for a homepage hero',       priority: 'medium', reward: 3    },
+        { id: 'live-23', secsAgo: 1200, title: 'Confirm a celebrity quote is authentic',                priority: 'low',    reward: 1.5  },
+        { id: 'live-24', secsAgo: 1310, title: 'Fix a broken JSON snippet',                             priority: 'medium', reward: 2    },
+        { id: 'live-25', secsAgo: 1430, title: 'Summarise a product return policy into bullet points',  priority: 'medium', reward: 3    },
+        { id: 'live-26', secsAgo: 1560, title: 'Assess WCAG colour contrast on a new logo',             priority: 'medium', reward: 2.5  },
+        { id: 'live-27', secsAgo: 1700, title: 'Identify the plant species in a garden photo',          priority: 'low',    reward: 1.5  },
+        { id: 'live-28', secsAgo: 1850, title: 'Classify this email as spam or not spam',               priority: 'low',    reward: 1    },
+        { id: 'live-29', secsAgo: 2010, title: 'Evaluate if a chatbot response is helpful',             priority: 'medium', reward: 2    },
+        { id: 'live-30', secsAgo: 2180, title: 'Transcribe a handwritten delivery address',             priority: 'high',   reward: 4    },
+        { id: 'live-31', secsAgo: 2360, title: 'Convert a recipe from cups to grams',                   priority: 'medium', reward: 3    },
+        { id: 'live-32', secsAgo: 2550, title: 'Identify the sport being played in an image',           priority: 'low',    reward: 0.5  },
+        { id: 'live-33', secsAgo: 2750, title: 'Label all visible objects in a street scene photo',     priority: 'medium', reward: 2.5  },
+        { id: 'live-34', secsAgo: 2960, title: 'Check if two addresses refer to the same location',     priority: 'low',    reward: 1    },
+        { id: 'live-35', secsAgo: 3180, title: 'Suggest 3 compelling product titles for a water bottle', priority: 'low',   reward: 2    },
+        { id: 'live-36', secsAgo: 3400, title: 'Review a social media profile for brand safety',        priority: 'high',   reward: 8    },
+        { id: 'live-37', secsAgo: 3630, title: 'Validate a UK phone number format',                     priority: 'low',    reward: 1    },
+        { id: 'live-38', secsAgo: 3870, title: 'Summarise 5 user reviews into pros and cons',           priority: 'high',   reward: 8    },
+        { id: 'live-39', secsAgo: 4120, title: 'Describe the tone of a tech blog post',                 priority: 'low',    reward: 1.5  },
+        { id: 'live-40', secsAgo: 4380, title: 'Flag missing required fields in a form submission',     priority: 'high',   reward: 3    },
+        { id: 'live-41', secsAgo: 4650, title: 'Confirm a URL redirects to the correct destination',    priority: 'medium', reward: 1.5  },
+        { id: 'live-42', secsAgo: 4930, title: 'Write a 1-sentence product tagline for PureFlow',       priority: 'low',    reward: 2    },
+        { id: 'live-43', secsAgo: 5220, title: 'Identify the main topic of a news article',             priority: 'low',    reward: 1.5  },
+        { id: 'live-44', secsAgo: 5520, title: 'Detect anomalous pricing in a product catalogue',       priority: 'medium', reward: 2    },
+        { id: 'live-45', secsAgo: 5830, title: 'Select the most professional LinkedIn headshot',        priority: 'low',    reward: 2    },
+        { id: 'live-46', secsAgo: 6150, title: 'Verify an EAN-13 barcode check digit',                  priority: 'medium', reward: 2    },
+        { id: 'live-47', secsAgo: 6480, title: 'Proofread a short marketing email for errors',          priority: 'high',   reward: 6    },
+        { id: 'live-48', secsAgo: 6820, title: 'Identify the language of a text snippet',               priority: 'low',    reward: 0.5  },
+        { id: 'live-49', secsAgo: 7170, title: 'Find the opening hours for a local pharmacy',           priority: 'low',    reward: 2    },
+        { id: 'live-50', secsAgo: 7530, title: 'Confirm a scientific DNA-similarity claim',             priority: 'low',    reward: 1.5  },
+    ];
+
+    for (const t of liveTasks) {
+        await prisma.task.create({
+            data: {
+                id: t.id,
+                title: t.title,
+                description: `Demo task seeded for local testing. Posted ${t.secsAgo}s ago.`,
+                status: 'open',
+                priority: t.priority as 'low' | 'medium' | 'high' | 'urgent',
+                rewardAmount: t.reward,
+                rewardCurrency: 'USD',
+                postedBy: 'demo-agent',
+                createdAt: new Date(now - t.secsAgo * 1000),
+            },
+        });
+    }
+
+    console.log(`🎬 Created ${liveTasks.length} live-feed demo tasks with fresh timestamps.`);
+}
 main()
     .catch((e) => {
         console.error(e);

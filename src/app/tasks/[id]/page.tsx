@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 
-import type { Task } from '../../../types';
+import type { Task, ReleaseReason } from '../../../types';
+import { RELEASE_REASON_LABELS } from '../../../types';
 import { useCountdown } from '../../../hooks/useCountdown';
+
+// Grace window in seconds — must match server config in releaseTask.ts
+const RELEASE_GRACE_SECS = 30;
 
 const priorityStyles: Record<Task['priority'], { color: string; bg: string }> = {
     low:    { color: 'var(--text-muted)',  bg: 'rgba(71,85,105,0.2)' },
@@ -38,6 +42,12 @@ export default function TaskDetailPage({ params }: PageProps) {
     const [submitting, setSubmitting] = useState(false);
     const [id, setId] = useState<string | null>(null);
 
+    // Release state
+    const [releasing, setReleasing] = useState(false);
+    const [releaseReason, setReleaseReason] = useState<ReleaseReason | ''>('');
+    const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
+    const [graceSecsLeft, setGraceSecsLeft] = useState<number | null>(null);
+
     useEffect(() => {
         params.then(({ id }) => setId(id));
     }, [params]);
@@ -49,6 +59,45 @@ export default function TaskDetailPage({ params }: PageProps) {
             .then((data) => { setTask(data); setLoading(false); })
             .catch(() => setLoading(false));
     }, [id]);
+
+    // Grace window countdown — ticks every second while task is claimed by this user
+    useEffect(() => {
+        if (!task?.claimedAt) { setGraceSecsLeft(null); return; }
+        const claimedMs = new Date(task.claimedAt).getTime();
+        const graceEndsMs = claimedMs + RELEASE_GRACE_SECS * 1000;
+
+        function tick() {
+            const left = Math.max(0, Math.ceil((graceEndsMs - Date.now()) / 1000));
+            setGraceSecsLeft(left);
+        }
+        tick();
+        const id = setInterval(tick, 500);
+        return () => clearInterval(id);
+    }, [task?.claimedAt]);
+
+    const handleRelease = useCallback(async () => {
+        if (!id) return;
+        setReleasing(true);
+        setShowReleaseConfirm(false);
+        try {
+            const res = await fetch(`/api/tasks/${id}/release`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(releaseReason ? { reason: releaseReason } : {}),
+            });
+            if (res.ok) {
+                // Navigate back to work so the worker immediately gets a new offer
+                window.location.href = '/work';
+            } else {
+                const data = await res.json();
+                alert(data.error ?? 'Could not release task.');
+                setReleasing(false);
+            }
+        } catch {
+            alert('Network error — could not release task.');
+            setReleasing(false);
+        }
+    }, [id, releaseReason]);
 
     const userId = (session?.user as { id?: string; email?: string | null } | undefined)?.id ?? session?.user?.email;
     const isAssignee = !!(task?.assignedTo && userId && task.assignedTo === userId);
@@ -98,8 +147,8 @@ export default function TaskDetailPage({ params }: PageProps) {
         return (
             <div className="text-center py-24 space-y-3">
                 <p className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>Task not found.</p>
-                <a href="/" className="text-sm transition-colors hover:opacity-80" style={{ color: 'var(--accent)' }}>
-                    ← Back to tasks
+                <a href="/work" className="text-sm transition-colors hover:opacity-80" style={{ color: 'var(--accent)' }}>
+                    ← Back to work
                 </a>
             </div>
         );
@@ -110,8 +159,8 @@ export default function TaskDetailPage({ params }: PageProps) {
     return (
         <div className="max-w-2xl mx-auto space-y-5">
             {/* Back link */}
-            <a href="/" className="inline-flex items-center gap-1 text-sm transition-colors hover:opacity-80" style={{ color: 'var(--accent)' }}>
-                ← Back to tasks
+            <a href="/work" className="inline-flex items-center gap-1 text-sm transition-colors hover:opacity-80" style={{ color: 'var(--accent)' }}>
+                ← Back to work
             </a>
 
             {/* Main card */}
@@ -242,16 +291,26 @@ export default function TaskDetailPage({ params }: PageProps) {
 
                 {/* ── Action area ── */}
 
-                {/* Open → claim */}
+                {/* Open → direct claim no longer allowed; route via Work Session */}
                 {task.status === 'open' && (
-                    <button
-                        onClick={handleClaim}
-                        disabled={claiming}
-                        className="w-full py-2.5 text-sm font-semibold rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
-                        style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                    <div
+                        className="rounded-lg border p-4 space-y-2 text-center"
+                        style={{ borderColor: 'rgba(99,102,241,0.3)', backgroundColor: 'rgba(99,102,241,0.05)' }}
                     >
-                        {claiming ? 'Claiming…' : session ? 'Accept this task' : 'Sign in to accept'}
-                    </button>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+                            This task is available via Work Session
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                            Tasks are routed fairly to workers. Start a session to receive this or similar tasks.
+                        </p>
+                        <a
+                            href="/work"
+                            className="inline-block mt-1 px-4 py-2 text-sm font-semibold rounded-lg transition-opacity hover:opacity-90"
+                            style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+                        >
+                            Start earning →
+                        </a>
+                    </div>
                 )}
 
                 {/* Claimed by someone else */}
@@ -268,12 +327,13 @@ export default function TaskDetailPage({ params }: PageProps) {
                     </div>
                 )}
 
-                {/* Claimed by current user → submit */}
+                {/* Claimed by current user → submit + release */}
                 {task.status === 'claimed' && isAssignee && (
                     <div
-                        className="space-y-3 pt-4 border-t"
+                        className="space-y-4 pt-4 border-t"
                         style={{ borderColor: 'var(--border-dim)' }}
                     >
+                        {/* Submit result */}
                         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Submit your result</p>
                         <textarea
                             value={result}
@@ -281,10 +341,7 @@ export default function TaskDetailPage({ params }: PageProps) {
                             placeholder="Enter your response or findings here…"
                             rows={5}
                             className="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm focus:outline-none focus:ring-1 resize-y"
-                            style={{
-                                borderColor: 'var(--border)',
-                                color: 'var(--text-primary)',
-                            }}
+                            style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                         />
                         <button
                             onClick={handleSubmitResult}
@@ -294,6 +351,101 @@ export default function TaskDetailPage({ params }: PageProps) {
                         >
                             {submitting ? 'Submitting…' : 'Submit for verification'}
                         </button>
+
+                        {/* ── Release section ── */}
+                        <div className="pt-2 border-t" style={{ borderColor: 'var(--border-dim)' }}>
+                            {/* Grace banner */}
+                            {graceSecsLeft !== null && graceSecsLeft > 0 && (
+                                <div
+                                    className="flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 mb-3"
+                                    style={{
+                                        borderColor: 'rgba(52,211,153,0.25)',
+                                        backgroundColor: 'rgba(52,211,153,0.05)',
+                                    }}
+                                >
+                                    <p className="text-xs" style={{ color: 'var(--green)' }}>
+                                        ✓ You can release this task without penalty for the next{' '}
+                                        <strong>{graceSecsLeft}s</strong>.
+                                    </p>
+                                </div>
+                            )}
+                            {graceSecsLeft !== null && graceSecsLeft === 0 && (
+                                <div
+                                    className="flex items-center gap-2 rounded-lg border px-4 py-2.5 mb-3"
+                                    style={{
+                                        borderColor: 'rgba(251,191,36,0.3)',
+                                        backgroundColor: 'rgba(251,191,36,0.05)',
+                                    }}
+                                >
+                                    <span>⚠️</span>
+                                    <p className="text-xs" style={{ color: 'var(--amber)' }}>
+                                        Releasing now will affect your reliability score.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Inline confirmation panel (shown after clicking Release) */}
+                            {showReleaseConfirm ? (
+                                <div
+                                    className="rounded-lg border p-4 space-y-3"
+                                    style={{ borderColor: 'rgba(248,113,113,0.3)', backgroundColor: 'rgba(248,113,113,0.04)' }}
+                                >
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--red)' }}>
+                                        Release this task?
+                                    </p>
+                                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                        The task will return to the queue and your reliability score will be reduced.
+                                        You will not receive this task again for 24 hours.
+                                    </p>
+                                    {/* Reason picker */}
+                                    <select
+                                        value={releaseReason}
+                                        onChange={(e) => setReleaseReason(e.target.value as ReleaseReason | '')}
+                                        className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm focus:outline-none"
+                                        style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                                    >
+                                        <option value="">Reason (optional)</option>
+                                        {(Object.entries(RELEASE_REASON_LABELS) as [ReleaseReason, string][]).map(([k, v]) => (
+                                            <option key={k} value={k}>{v}</option>
+                                        ))}
+                                    </select>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleRelease}
+                                            disabled={releasing}
+                                            className="flex-1 py-2 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                                            style={{ backgroundColor: 'var(--red)', color: '#fff' }}
+                                        >
+                                            {releasing ? 'Releasing…' : 'Confirm release'}
+                                        </button>
+                                        <button
+                                            onClick={() => setShowReleaseConfirm(false)}
+                                            disabled={releasing}
+                                            className="flex-1 py-2 text-sm rounded-lg border transition-colors hover:bg-white/5 disabled:opacity-50"
+                                            style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                                        >
+                                            Keep task
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        if (graceSecsLeft && graceSecsLeft > 0) {
+                                            // Within grace — release immediately, no confirm needed
+                                            handleRelease();
+                                        } else {
+                                            setShowReleaseConfirm(true);
+                                        }
+                                    }}
+                                    disabled={releasing}
+                                    className="w-full py-2 text-sm rounded-lg border transition-colors hover:bg-white/5 disabled:opacity-50"
+                                    style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+                                >
+                                    {releasing ? 'Releasing…' : 'Release back to queue'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
 

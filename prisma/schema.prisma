@@ -14,14 +14,30 @@ datasource db {
 
 enum TaskStatus {
   open
+  offered             // short-lived offer sent to one worker; not yet accepted
   claimed
-  in_progress     @map("in-progress")
+  in_progress         @map("in-progress")
   pending_verification
   approved
   rejected
   completed
   expired
   cancelled
+}
+
+enum SessionStatus {
+  active
+  paused
+  ended
+}
+
+enum OfferStatus {
+  pending
+  accepted
+  skipped
+  expired
+  cancelled
+  released
 }
 
 enum TaskPriority {
@@ -68,12 +84,14 @@ model Task {
   claimedAt          DateTime?
   claimExpiresAt     DateTime?  // claimedAt + claimTimeoutMins
   completionDeadline DateTime?  // claimedAt + completionMins
+  releasedAt         DateTime?  // set when a worker releases back to pool
 
   // Assignment
   postedBy         String
   assignedTo       String?
   autoReassign     Boolean      @default(true)
   reassignCount    Int          @default(0)
+  releaseCount     Int          @default(0)  // how many times this task has been released
 
   // Results
   result           String?
@@ -83,7 +101,9 @@ model Task {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  earnings EarningEntry[]
+  earnings       EarningEntry[]
+  offers         TaskOffer[]
+  releaseEvents  TaskReleaseEvent[]
 }
 
 model EarningEntry {
@@ -109,14 +129,83 @@ model PayoutRequest {
 }
 
 model WorkerStat {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  totalClaimed       Int      @default(0)
-  totalCompleted     Int      @default(0)
-  totalApproved      Int      @default(0)
-  totalRejected      Int      @default(0)
-  totalExpired       Int      @default(0)  // timed out without submitting
-  avgCompletionSecs  Float?
-  reliabilityScore   Float    @default(1.0) // 0–1 composite score
-  updatedAt          DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  totalClaimed          Int       @default(0)
+  totalCompleted        Int       @default(0)
+  totalApproved         Int       @default(0)
+  totalRejected         Int       @default(0)
+  totalExpired          Int       @default(0)  // timed out without submitting
+  avgCompletionSecs     Float?
+  // Release tracking
+  releasedTaskCount     Int       @default(0)  // total releases ever
+  graceReleasedTaskCount Int      @default(0)  // releases within grace window (no penalty)
+  lateReleasedTaskCount  Int      @default(0)  // releases outside grace window (penalty)
+  // Reputation
+  reliabilityScore      Float     @default(1.0) // 0–1 composite score
+  currentCooldownUntil  DateTime?              // worker cannot receive offers until this time
+  updatedAt             DateTime  @updatedAt
+}
+
+// ─── Session-based routing models ────────────────────────────────────────────
+
+model WorkerSession {
+  id                  String        @id @default(cuid())
+  workerId            String
+  status              SessionStatus @default(active)
+  startedAt           DateTime      @default(now())
+  endedAt             DateTime?
+  lastHeartbeatAt     DateTime      @default(now())
+  acceptedCount       Int           @default(0)
+  skippedCount        Int           @default(0)
+  expiredOfferCount   Int           @default(0)
+
+  offers              TaskOffer[]
+
+  @@index([workerId])
+  @@index([status, lastHeartbeatAt])
+}
+
+model TaskOffer {
+  id           String      @id @default(cuid())
+  taskId       String
+  workerId     String
+  sessionId    String
+  status       OfferStatus @default(pending)
+  offeredAt    DateTime    @default(now())
+  expiresAt    DateTime
+  respondedAt  DateTime?
+  // Accept & release tracking
+  acceptedAt              DateTime?
+  releasedAt              DateTime?
+  releaseReason           String?
+  releasePenaltyApplied   Boolean   @default(false)
+
+  session      WorkerSession @relation(fields: [sessionId], references: [id])
+  task         Task          @relation(fields: [taskId], references: [id])
+
+  @@index([workerId, status])
+  @@index([taskId, status])
+  @@index([status, expiresAt])
+}
+
+// ─── Audit log ────────────────────────────────────────────────────────────────
+
+model TaskReleaseEvent {
+  id                String   @id @default(cuid())
+  taskId            String
+  workerId          String
+  offerId           String
+  withinGrace       Boolean
+  reason            String?
+  penaltyApplied    Boolean
+  reliabilityBefore Float
+  reliabilityAfter  Float
+  createdAt         DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@index([workerId])
+  @@index([taskId])
+  @@index([workerId, createdAt])
 }

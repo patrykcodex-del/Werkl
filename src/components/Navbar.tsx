@@ -7,8 +7,9 @@ import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
 
 const navLinks = [
+    { href: '/work',      label: '⚡ Work' },
     { href: '/dashboard', label: 'Dashboard' },
-    { href: '/earnings', label: 'Earnings' },
+    { href: '/earnings',  label: 'Earnings' },
 ];
 
 const Navbar: React.FC = () => {

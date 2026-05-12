@@ -1,5 +1,6 @@
 export type TaskStatus =
     | 'open'
+    | 'offered'           // task is currently offered to one worker
     | 'claimed'
     | 'in-progress'
     | 'pending_verification'
@@ -12,6 +13,21 @@ export type TaskStatus =
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 export type TaskType = 'sync' | 'async';
+
+export type ReleaseReason =
+    | 'unclear_instructions'
+    | 'too_difficult'
+    | 'not_enough_time'
+    | 'wrong_task_type'
+    | 'other';
+
+export const RELEASE_REASON_LABELS: Record<ReleaseReason, string> = {
+    unclear_instructions: 'Instructions are unclear',
+    too_difficult:        'Task is too difficult',
+    not_enough_time:      'Not enough time to complete',
+    wrong_task_type:      'Not the right task type for me',
+    other:                'Other',
+};
 
 export interface TaskReward {
     amount: number;
@@ -29,21 +45,23 @@ export interface Task {
     reward?: TaskReward;
 
     // Time limits
-    estimatedMins?: number;         // expected work duration
-    claimTimeoutMins: number;       // minutes before unclaimed task returns to pool (default 5)
-    completionMins?: number;        // hard completion deadline after claiming
-    expiresAt?: string;             // ISO — hard expiry while open
+    estimatedMins?: number;
+    claimTimeoutMins: number;
+    completionMins?: number;
+    expiresAt?: string;
 
     // Lifecycle timestamps
     claimedAt?: string;
-    claimExpiresAt?: string;        // claimedAt + claimTimeoutMins
-    completionDeadline?: string;    // claimedAt + completionMins
+    claimExpiresAt?: string;
+    completionDeadline?: string;
+    releasedAt?: string;
 
     // Assignment
     postedBy: string;
     assignedTo?: string;
     autoReassign: boolean;
     reassignCount: number;
+    releaseCount: number;
 
     result?: string;
     verificationNote?: string;
@@ -84,5 +102,43 @@ export interface WorkerStat {
     totalRejected: number;
     totalExpired: number;
     avgCompletionSecs?: number;
+    releasedTaskCount: number;
+    graceReleasedTaskCount: number;
+    lateReleasedTaskCount: number;
     reliabilityScore: number;  // 0–1
+    currentCooldownUntil?: string; // ISO date — worker blocked until this time
+}
+
+// ─── Session-based routing ────────────────────────────────────────────────────
+
+export type SessionStatus = 'active' | 'paused' | 'ended';
+export type OfferStatus = 'pending' | 'accepted' | 'skipped' | 'expired' | 'cancelled' | 'released';
+
+export interface WorkerSession {
+    id: string;
+    workerId: string;
+    status: SessionStatus;
+    startedAt: string;
+    endedAt?: string;
+    lastHeartbeatAt: string;
+    acceptedCount: number;
+    skippedCount: number;
+    expiredOfferCount: number;
+}
+
+export interface TaskOffer {
+    id: string;
+    taskId: string;
+    workerId: string;
+    sessionId: string;
+    status: OfferStatus;
+    offeredAt: string;
+    expiresAt: string;
+    respondedAt?: string;
+    acceptedAt?: string;
+    releasedAt?: string;
+    releaseReason?: string;
+    releasePenaltyApplied?: boolean;
+    /** Populated when fetching the current offer */
+    task?: Task;
 }

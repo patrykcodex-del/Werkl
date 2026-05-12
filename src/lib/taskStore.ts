@@ -40,10 +40,12 @@ function toTask(p: PrismaTask): Task {
         claimedAt: p.claimedAt?.toISOString(),
         claimExpiresAt: p.claimExpiresAt?.toISOString(),
         completionDeadline: p.completionDeadline?.toISOString(),
+        releasedAt: p.releasedAt?.toISOString(),
         postedBy: p.postedBy,
         assignedTo: p.assignedTo ?? undefined,
         autoReassign: p.autoReassign,
         reassignCount: p.reassignCount,
+        releaseCount: p.releaseCount,
         result: p.result ?? undefined,
         verificationNote: p.verificationNote ?? undefined,
         paidOut: p.paidOut,
@@ -55,6 +57,7 @@ function toTask(p: PrismaTask): Task {
 function toPrismaStatus(status: TaskStatus) {
     return status.replace('in-progress', 'in_progress') as
         | 'open'
+        | 'offered'
         | 'claimed'
         | 'in_progress'
         | 'pending_verification'
