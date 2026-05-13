@@ -1,4 +1,4 @@
-# Human Fallback Layer
+# Werkl
 
 This project serves as a "human fallback layer" for AI, allowing individuals to offer their services for tasks that AI cannot complete. The application connects users with tasks that require human intervention, providing a platform for collaboration between AI and human capabilities.
 
