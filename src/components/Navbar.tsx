@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
+import { AuthDialog } from './AuthDialog';
 
 const Navbar: React.FC = () => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [authOpen, setAuthOpen] = useState(false);
     const [visible, setVisible] = useState(true);
     const lastScrollY = useRef(0);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -45,6 +47,7 @@ const Navbar: React.FC = () => {
     }, [dropdownOpen]);
 
     return (
+        <>
         <nav
             className="fixed top-0 inset-x-0 z-50 border-b transition-transform duration-300"
             style={{
@@ -146,17 +149,23 @@ const Navbar: React.FC = () => {
                             )}
                         </div>
                     ) : (
-                        <Link
-                            href="/auth/signin"
+                        <button
+                            onClick={() => setAuthOpen(true)}
                             className="px-4 py-1.5 text-sm font-medium rounded-md border transition-colors hover:bg-white/5"
                             style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
                         >
                             Sign in
-                        </Link>
+                        </button>
                     )}
                 </div>
             </div>
         </nav>
+        <AuthDialog
+            open={authOpen}
+            onClose={() => setAuthOpen(false)}
+            callbackUrl="/"
+        />
+        </>
     );
 };
 

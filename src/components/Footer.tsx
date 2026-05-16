@@ -17,7 +17,9 @@ const Footer = () => {
                     </p>
                 </div>
                 <div className="flex gap-5 text-sm" style={{ color: 'var(--text-muted)' }}>
-                    <Link href="/" className="transition-colors hover:text-slate-300" style={{ color: 'inherit' }}>Home</Link>
+                    <Link href="/" className="transition-colors hover:opacity-80" style={{ color: 'inherit' }}>Home</Link>
+                    <Link href="/terms" className="transition-colors hover:opacity-80" style={{ color: 'inherit' }}>Terms</Link>
+                    <Link href="/privacy" className="transition-colors hover:opacity-80" style={{ color: 'inherit' }}>Privacy</Link>
                 </div>
             </div>
         </footer>
