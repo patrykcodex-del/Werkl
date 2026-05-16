@@ -271,7 +271,7 @@ export function AuthDialog({
 
     async function handleSignIn(providerId: string) {
         setLoadingId(providerId);
-        const extra = providerId === 'google' ? { prompt: 'select_account' } : {};
+        const extra: Record<string, string> = providerId === 'google' ? { prompt: 'select_account' } : {};
         await signIn(providerId, { callbackUrl }, extra);
         // signIn redirects the browser; this line is a safety fallback
         setLoadingId(null);
