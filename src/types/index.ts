@@ -6,7 +6,6 @@ export type TaskStatus =
     | 'pending_verification'
     | 'approved'
     | 'rejected'
-    | 'completed'
     | 'expired'
     | 'cancelled';
 

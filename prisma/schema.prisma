@@ -20,7 +20,6 @@ enum TaskStatus {
   pending_verification
   approved
   rejected
-  completed
   expired
   cancelled
 }
@@ -88,6 +87,7 @@ model Task {
 
   // Assignment
   postedBy         String
+  postedByAgent    Agent        @relation(fields: [postedBy], references: [id])
   assignedTo       String?
   autoReassign     Boolean      @default(true)
   reassignCount    Int          @default(0)
@@ -104,6 +104,7 @@ model Task {
   earnings       EarningEntry[]
   offers         TaskOffer[]
   releaseEvents  TaskReleaseEvent[]
+  workerBlocks   TaskWorkerBlock[]
 }
 
 model EarningEntry {
@@ -208,4 +209,34 @@ model TaskReleaseEvent {
   @@index([workerId])
   @@index([taskId])
   @@index([workerId, createdAt])
+}
+
+// ─── Agent ────────────────────────────────────────────────────────────────────
+
+model Agent {
+  id               String   @id @default(cuid())
+  name             String
+  apiKeyHash       String   @unique
+  callbackUrl      String?
+  suspended        Boolean  @default(false)
+  tasksPostedCount Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tasks            Task[]
+}
+
+// ─── TaskWorkerBlock ──────────────────────────────────────────────────────────
+
+model TaskWorkerBlock {
+  id        String   @id @default(cuid())
+  taskId    String
+  workerId  String
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id])
+
+  @@unique([taskId, workerId])
+  @@index([taskId])
+  @@index([workerId])
 }

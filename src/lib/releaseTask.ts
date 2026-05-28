@@ -92,7 +92,7 @@ export async function releaseAcceptedTask(
         if (!task) throw new ReleaseError('NOT_FOUND', 'Task not found');
         if (task.assignedTo !== workerId) throw new ReleaseError('NOT_OWNER', 'You do not own this task');
         if (task.status !== 'claimed' && task.status !== 'in_progress') {
-            if (['pending_verification', 'approved', 'rejected', 'completed', 'cancelled', 'expired'].includes(task.status)) {
+            if (['pending_verification', 'approved', 'rejected', 'cancelled', 'expired'].includes(task.status)) {
                 throw new ReleaseError('ALREADY_SUBMITTED', 'Task cannot be released in its current state');
             }
             throw new ReleaseError('WRONG_STATUS', `Cannot release a task with status "${task.status}"`);

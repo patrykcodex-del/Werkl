@@ -2,7 +2,7 @@
  * GET /api/tasks/history
  *
  * Returns the authenticated worker's task history:
- *   - completed / approved / pending_verification  → "done"
+ *   - approved / pending_verification  → "done"
  *   - expired (was assigned to them)               → "missed"
  *   - rejected                                     → "rejected"
  *
@@ -21,7 +21,7 @@ function getUserId(session: Awaited<ReturnType<typeof getServerSession>>): strin
     return user?.id ?? user?.email ?? null;
 }
 
-const DONE_STATUSES:   $Enums.TaskStatus[] = ['completed', 'approved', 'pending_verification', 'rejected'];
+const DONE_STATUSES:   $Enums.TaskStatus[] = ['approved', 'pending_verification', 'rejected'];
 const MISSED_STATUSES: $Enums.TaskStatus[] = ['expired'];
 
 export async function GET(req: NextRequest) {

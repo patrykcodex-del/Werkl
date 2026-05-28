@@ -16,7 +16,6 @@ const statusStyles: Record<Task['status'], string> = {
     offered:              'var(--accent)',
     claimed:              'var(--amber)',
     'in-progress':        'var(--accent)',
-    completed:            'var(--text-muted)',
     cancelled:            'var(--red)',
     expired:              'var(--text-muted)',
     pending_verification: 'var(--cyan)',

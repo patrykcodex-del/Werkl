@@ -63,7 +63,6 @@ function toPrismaStatus(status: TaskStatus) {
         | 'pending_verification'
         | 'approved'
         | 'rejected'
-        | 'completed'
         | 'expired'
         | 'cancelled';
 }

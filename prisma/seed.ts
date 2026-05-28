@@ -7,6 +7,18 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
     console.log('🌱 Seeding database...');
 
+    // ── Demo Agent ────────────────────────────────────────────────────────────
+    // Must exist before tasks since Task.postedBy is a FK → Agent.id
+    await prisma.agent.upsert({
+        where: { id: 'demo-agent' },
+        update: {},
+        create: {
+            id: 'demo-agent',
+            name: 'Demo Agent',
+            apiKeyHash: 'demo-api-key-hash-not-for-production',
+        },
+    });
+
     // Upsert demo tasks so seed is idempotent
     await prisma.task.upsert({
         where: { id: 'demo-1' },
