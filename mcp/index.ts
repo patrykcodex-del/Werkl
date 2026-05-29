@@ -23,6 +23,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { taskStatusSchema } from './schemas.js';
 
 const API_URL = process.env.WERKL_API_URL ?? 'http://localhost:3000';
 const API_KEY = process.env.WERKL_API_KEY ?? '';
@@ -92,7 +93,7 @@ server.tool(
     'list_tasks',
     'List tasks on werkl.ai, optionally filtered by status.',
     {
-        status: z.enum(['open', 'claimed', 'in-progress', 'completed', 'cancelled']).optional().describe('Filter by task status'),
+        status: taskStatusSchema.optional().describe('Filter by task status'),
     },
     async ({ status }) => {
         const path = status ? `/api/tasks?status=${status}` : '/api/tasks';
