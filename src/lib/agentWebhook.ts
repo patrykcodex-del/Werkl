@@ -1,6 +1,8 @@
+import type { TaskStatus } from '../types';
+
 interface WebhookPayload {
     taskId: string;
-    status: string;
+    status: TaskStatus;
     title: string;
 }
 

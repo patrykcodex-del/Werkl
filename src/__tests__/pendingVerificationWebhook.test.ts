@@ -96,7 +96,7 @@ describe('PATCH /api/tasks/[id] — pending_verification webhook', () => {
         );
 
         expect(res.status).toBe(200);
-        expect(mockFireAgentWebhook).toHaveBeenCalledWith(null, expect.any(Object));
+        expect(mockFireAgentWebhook).not.toHaveBeenCalled();
     });
 
     it('still returns 200 even if the agent lookup fails', async () => {

@@ -140,11 +140,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             select: { callbackUrl: true },
         }).catch(() => null);
 
-        fireAgentWebhook(postingAgent?.callbackUrl ?? null, {
-            taskId: task.id,
-            status: 'pending_verification',
-            title: task.title,
-        });
+        if (postingAgent?.callbackUrl) {
+            fireAgentWebhook(postingAgent.callbackUrl, {
+                taskId: task.id,
+                status: 'pending_verification',
+                title: task.title,
+            });
+        }
 
         return NextResponse.json(updated);
     }
