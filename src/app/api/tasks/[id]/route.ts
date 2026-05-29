@@ -5,6 +5,7 @@ import { prisma } from '../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { authenticateAgentFromRequest } from '../../../../lib/agentAuth';
+import { fireAgentWebhook } from '../../../../lib/agentWebhook';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -128,11 +129,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         if (!result?.trim()) {
             return NextResponse.json({ error: 'result is required' }, { status: 400 });
         }
-        return NextResponse.json(await updateTask(id, {
+        const updated = await updateTask(id, {
             status: 'pending_verification',
             result,
             claimExpiresAt: undefined,
-        }));
+        });
+
+        const postingAgent = await prisma.agent.findUnique({
+            where: { id: task.postedBy },
+            select: { callbackUrl: true },
+        }).catch(() => null);
+
+        if (postingAgent?.callbackUrl) {
+            fireAgentWebhook(postingAgent.callbackUrl, {
+                taskId: task.id,
+                status: 'pending_verification',
+                title: task.title,
+            });
+        }
+
+        return NextResponse.json(updated);
     }
 
     return NextResponse.json({ error: 'Invalid status transition' }, { status: 400 });
