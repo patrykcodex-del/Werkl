@@ -38,3 +38,12 @@ export const postTaskInputSchema = z.object({
     reward_amount: z.number().optional().describe('How much to pay the human (e.g. 5.00)'),
     reward_currency: z.string().optional().default('USD').describe('Currency code (e.g. USD, EUR)'),
 });
+
+// ── reopen_task ────────────────────────────────────────────────────────────────
+export const reopenTaskInputSchema = z.object({
+    id: z.string().describe('The task ID to reopen'),
+    api_key: z
+        .string()
+        .optional()
+        .describe('Your per-agent API key. Only required if WERKL_API_KEY is not set in the MCP server environment.'),
+});
