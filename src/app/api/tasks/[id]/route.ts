@@ -24,9 +24,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { status, result, verificationNote, approved } = body;
 
     // ── Agent / API key path ──────────────────────────────────────────────────
-    const hasApiKey = req.headers.get('x-api-key');
-    if (hasApiKey) {
-        const authResult = await authenticateAgentFromRequest(req);
+    const agentKeyPresent = req.headers.get('x-api-key') !== null;
+    if (agentKeyPresent) {
+        const authResult = await authenticateAgentFromRequest(req.headers);
         if (!authResult.success) {
             return NextResponse.json({ error: authResult.error }, { status: authResult.status });
         }

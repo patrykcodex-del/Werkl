@@ -69,10 +69,12 @@ const otherAgent = {
     updatedAt: new Date(),
 };
 
-function makePatchRequest(apiKey: string, body: object) {
+function makePatchRequest(apiKey: string | null, body: object) {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (apiKey !== null) headers['x-api-key'] = apiKey;
     return new NextRequest('http://localhost/api/tasks/task-1', {
         method: 'PATCH',
-        headers: { 'x-api-key': apiKey, 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
     });
 }
@@ -127,5 +129,16 @@ describe('PATCH /api/tasks/[id] — Agent Verification auth', () => {
         });
 
         expect(res.status).toBe(403);
+    });
+
+    it('returns 401 when x-api-key header is present but empty', async () => {
+        mockGetTask.mockResolvedValueOnce(baseTask as never);
+
+        const res = await PATCH(makePatchRequest('', { approved: true }), {
+            params: Promise.resolve({ id: 'task-1' }),
+        });
+
+        expect(res.status).toBe(401);
+        expect(mockFindUnique).not.toHaveBeenCalled();
     });
 });

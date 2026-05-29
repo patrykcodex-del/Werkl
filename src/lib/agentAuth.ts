@@ -1,7 +1,6 @@
 import { createHmac, randomBytes } from 'crypto';
 import { prisma } from './prisma';
 import type { Agent } from '../generated/prisma/client';
-import type { NextRequest } from 'next/server';
 
 export function generateApiKey(): string {
     return randomBytes(32).toString('hex');
@@ -30,11 +29,12 @@ type AgentAuthResult =
 
 /**
  * Resolve the calling Agent from the `x-api-key` request header.
+ * Accepts a standard `Headers` object so this helper is not tied to Next.js.
  * Returns a structured result so callers can return the correct HTTP status
  * without needing to know the auth internals.
  */
-export async function authenticateAgentFromRequest(req: NextRequest): Promise<AgentAuthResult> {
-    const apiKey = req.headers.get('x-api-key');
+export async function authenticateAgentFromRequest(headers: Headers): Promise<AgentAuthResult> {
+    const apiKey = headers.get('x-api-key');
     if (!apiKey) return { success: false, status: 401, error: 'API key required' };
 
     const agent = await authenticateAgent(apiKey);
