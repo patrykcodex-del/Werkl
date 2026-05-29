@@ -4,6 +4,7 @@ import { creditEarning } from '../../../../lib/earningsStore';
 import { prisma } from '../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
+import { authenticateAgentFromRequest } from '../../../../lib/agentAuth';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,8 +24,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { status, result, verificationNote, approved } = body;
 
     // ── Agent / API key path ──────────────────────────────────────────────────
-    const apiKey = req.headers.get('x-api-key');
-    if (apiKey && apiKey === process.env.WERKL_API_KEY) {
+    const hasApiKey = req.headers.get('x-api-key');
+    if (hasApiKey) {
+        const authResult = await authenticateAgentFromRequest(req);
+        if (!authResult.success) {
+            return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+        }
+
+        const { agent } = authResult;
+        if (agent.id !== task.postedBy) {
+            return NextResponse.json({ error: 'Forbidden: only the posting Agent may verify this Task' }, { status: 403 });
+        }
+
         if (task.status !== 'pending_verification') {
             return NextResponse.json({ error: 'Task is not awaiting verification' }, { status: 409 });
         }
@@ -35,7 +46,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         const updated = await updateTask(id, { status: newStatus, verificationNote });
 
         if (task.assignedTo) {
-            // Update worker stat
             const completionSecs = task.claimedAt
                 ? (Date.now() - new Date(task.claimedAt).getTime()) / 1000
                 : undefined;
@@ -56,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
                     totalApproved: approved ? { increment: 1 } : undefined,
                     totalRejected: approved ? undefined : { increment: 1 },
                     ...(completionSecs !== undefined && {
-                        avgCompletionSecs: completionSecs, // simplified; full avg needs extra logic
+                        avgCompletionSecs: completionSecs,
                     }),
                 },
             });
@@ -102,7 +112,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             ...(completionDeadline && { completionDeadline }),
         });
 
-        // Track claim in worker stats
         await prisma.workerStat.upsert({
             where: { userId },
             create: { userId, totalClaimed: 1 },
@@ -119,7 +128,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         if (!result?.trim()) {
             return NextResponse.json({ error: 'result is required' }, { status: 400 });
         }
-        // Clear the claim expiry — worker has submitted in time
         return NextResponse.json(await updateTask(id, {
             status: 'pending_verification',
             result,

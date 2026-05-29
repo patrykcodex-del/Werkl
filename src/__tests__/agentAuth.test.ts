@@ -12,8 +12,9 @@ vi.mock('../lib/prisma', () => ({
     },
 }));
 
-import { generateApiKey, hashApiKey, authenticateAgent } from '../lib/agentAuth';
+import { generateApiKey, hashApiKey, authenticateAgent, authenticateAgentFromRequest } from '../lib/agentAuth';
 import { prisma } from '../lib/prisma';
+import { NextRequest } from 'next/server';
 
 const mockFindUnique = vi.mocked(prisma.agent.findUnique);
 
@@ -84,5 +85,48 @@ describe('authenticateAgent', () => {
         mockFindUnique.mockResolvedValueOnce({ ...fakeAgent, suspended: true });
         const agent = await authenticateAgent('valid-key');
         expect(agent?.suspended).toBe(true);
+    });
+});
+
+describe('authenticateAgentFromRequest', () => {
+    const fakeAgent = {
+        id: 'agent-1',
+        name: 'test-agent',
+        apiKeyHash: hashApiKey('valid-key'),
+        callbackUrl: null,
+        suspended: false,
+        tasksPostedCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+    };
+
+    function makeRequest(apiKey?: string) {
+        const headers: Record<string, string> = {};
+        if (apiKey !== undefined) headers['x-api-key'] = apiKey;
+        return new NextRequest('http://localhost/api/tasks/1', { headers });
+    }
+
+    it('returns 401 when x-api-key header is missing', async () => {
+        const result = await authenticateAgentFromRequest(makeRequest());
+        expect(result).toEqual({ success: false, status: 401, error: 'API key required' });
+        expect(mockFindUnique).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when the key is not found in the database', async () => {
+        mockFindUnique.mockResolvedValueOnce(null);
+        const result = await authenticateAgentFromRequest(makeRequest('bad-key'));
+        expect(result).toEqual({ success: false, status: 401, error: 'Invalid API key' });
+    });
+
+    it('returns 403 when the agent is suspended', async () => {
+        mockFindUnique.mockResolvedValueOnce({ ...fakeAgent, suspended: true });
+        const result = await authenticateAgentFromRequest(makeRequest('valid-key'));
+        expect(result).toEqual({ success: false, status: 403, error: 'Agent is suspended' });
+    });
+
+    it('returns success with the agent when the key is valid and agent is active', async () => {
+        mockFindUnique.mockResolvedValueOnce(fakeAgent);
+        const result = await authenticateAgentFromRequest(makeRequest('valid-key'));
+        expect(result).toEqual({ success: true, agent: fakeAgent });
     });
 });
