@@ -202,9 +202,16 @@ export async function routeNextTaskForSession(sessionId: string): Promise<TaskOf
             select: { taskId: true },
         });
 
+        // Tasks permanently blocked for this worker (Reopen flow: rejected result, can't retry)
+        const workerBlocks = await tx.taskWorkerBlock.findMany({
+            where: { workerId: session.workerId },
+            select: { taskId: true },
+        });
+
         const excludedTaskIds = [
             ...alreadySeenOffers.map((o) => o.taskId),
             ...recentReleases.map((r) => r.taskId),
+            ...workerBlocks.map((b) => b.taskId),
         ];
 
         const openTasks = await tx.task.findMany({

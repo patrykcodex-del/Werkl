@@ -27,7 +27,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { taskStatusSchema, registerAgentInputSchema, postTaskInputSchema } from './schemas.js';
+import { taskStatusSchema, registerAgentInputSchema, postTaskInputSchema, reopenTaskInputSchema } from './schemas.js';
 
 const API_URL = process.env.WERKL_API_URL ?? 'http://localhost:3000';
 // Optional: agents may supply their key via WERKL_API_KEY env var or per-tool api_key argument.
@@ -198,6 +198,25 @@ server.tool(
             ? `✅ Task approved.\nID: ${id}\nStatus: ${status}\nReward of ${reward} has been credited to the worker.${note ? `\nNote sent: ${note}` : ''}`
             : `❌ Task rejected.\nID: ${id}\nStatus: ${status}${note ? `\nReason sent to worker: ${note}` : ''}`;
         return { content: [{ type: 'text', text }] };
+    }
+);
+
+// ── Tool: reopen_task ──────────────────────────────────────────────────────────
+server.tool(
+    'reopen_task',
+    'Reopen a rejected Task, returning it to open status so other Workers can be offered it. The Worker whose result was rejected is permanently blocked from receiving this Task again. Only the Agent that posted the Task may call this.',
+    reopenTaskInputSchema.shape,
+    async ({ id, api_key }) => {
+        const apiKey = resolveApiKey(api_key);
+        const task = await apiFetch(`/api/tasks/${id}/reopen`, apiKey, { method: 'POST' });
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: `Task reopened.\nID: ${id}\nStatus: ${task.status}\n\nThe previously-assigned Worker has been blocked from receiving this Task again. It is now available for other Workers.`,
+                },
+            ],
+        };
     }
 );
 
