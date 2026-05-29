@@ -16,9 +16,10 @@ describe('reopen_task tool schema', () => {
         ).toBe(true);
     });
 
-    it('rejects unknown extra fields', () => {
+    it('strips unknown extra fields (permissive schema)', () => {
         const result = reopenTaskInputSchema.safeParse({ id: 'task-abc', unknown: 'field' });
-        // strict mode would reject; permissive mode passes — either is fine but id must be present
+        expect(result.success).toBe(true);
         expect(result.data?.id).toBe('task-abc');
+        expect((result.data as Record<string, unknown>).unknown).toBeUndefined();
     });
 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTask, updateTask } from '../../../../../lib/taskStore';
+import { getTask } from '../../../../../lib/taskStore';
 import { prisma } from '../../../../../lib/prisma';
 import { authenticateAgentFromRequest } from '../../../../../lib/agentAuth';
 
@@ -31,12 +31,18 @@ export async function POST(req: NextRequest, { params }: Params) {
         );
     }
 
-    if (task.assignedTo) {
-        await prisma.taskWorkerBlock.create({
-            data: { taskId: task.id, workerId: task.assignedTo },
+    const updated = await prisma.$transaction(async (tx) => {
+        if (task.assignedTo) {
+            await tx.taskWorkerBlock.upsert({
+                where: { taskId_workerId: { taskId: task.id, workerId: task.assignedTo } },
+                create: { taskId: task.id, workerId: task.assignedTo },
+                update: {},
+            });
+        }
+        return tx.task.update({
+            where: { id },
+            data: { status: 'open', assignedTo: null },
         });
-    }
-
-    const updated = await updateTask(id, { status: 'open', assignedTo: null });
+    });
     return NextResponse.json(updated);
 }

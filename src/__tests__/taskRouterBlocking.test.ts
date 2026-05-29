@@ -130,9 +130,12 @@ describe('taskRouter — TaskWorkerBlock exclusion', () => {
 
         await routeNextTaskForSession(SESSION_ID);
 
-        // The 3rd task.findMany call is the open-tasks query (calls 1 & 2 are for expired/orphaned)
-        const openTasksCall = mockTx.task.findMany.mock.calls[2];
-        expect(openTasksCall[0].where.id?.notIn).toContain(BLOCKED_TASK_ID);
+        // Find the open-tasks query by matching where.status === 'open'
+        const openTasksCall = mockTx.task.findMany.mock.calls.find(
+            (call: [{ where?: { status?: string } }]) => call[0]?.where?.status === 'open'
+        );
+        expect(openTasksCall).toBeDefined();
+        expect(openTasksCall![0].where.id?.notIn).toContain(BLOCKED_TASK_ID);
     });
 
     it('returns an offer for a non-blocked Task even when the worker has a block on another Task', async () => {

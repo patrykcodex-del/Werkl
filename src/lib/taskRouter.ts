@@ -209,9 +209,11 @@ export async function routeNextTaskForSession(sessionId: string): Promise<TaskOf
         });
 
         const excludedTaskIds = [
-            ...alreadySeenOffers.map((o) => o.taskId),
-            ...recentReleases.map((r) => r.taskId),
-            ...workerBlocks.map((b) => b.taskId),
+            ...new Set([
+                ...alreadySeenOffers.map((o) => o.taskId),
+                ...recentReleases.map((r) => r.taskId),
+                ...workerBlocks.map((b) => b.taskId),
+            ]),
         ];
 
         const openTasks = await tx.task.findMany({

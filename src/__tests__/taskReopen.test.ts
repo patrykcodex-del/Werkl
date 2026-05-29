@@ -3,14 +3,23 @@ import { NextRequest } from 'next/server';
 
 process.env.API_KEY_PEPPER = 'test-pepper';
 
+const { mockTxBlockUpsert, mockTxTaskUpdate } = vi.hoisted(() => ({
+    mockTxBlockUpsert: vi.fn(),
+    mockTxTaskUpdate: vi.fn(),
+}));
+
 vi.mock('../lib/taskStore', () => ({
     getTask: vi.fn(),
-    updateTask: vi.fn(),
 }));
 
 vi.mock('../lib/prisma', () => ({
     prisma: {
-        taskWorkerBlock: { create: vi.fn() },
+        $transaction: vi.fn((cb: (tx: unknown) => unknown) =>
+            cb({
+                taskWorkerBlock: { upsert: mockTxBlockUpsert },
+                task: { update: mockTxTaskUpdate },
+            })
+        ),
         agent: { findUnique: vi.fn() },
     },
 }));
@@ -21,14 +30,12 @@ vi.mock('next-auth', () => ({
 }));
 
 import { POST } from '../app/api/tasks/[id]/reopen/route';
-import { getTask, updateTask } from '../lib/taskStore';
+import { getTask } from '../lib/taskStore';
 import { prisma } from '../lib/prisma';
 import { hashApiKey } from '../lib/agentAuth';
 
 const mockGetTask = vi.mocked(getTask);
-const mockUpdateTask = vi.mocked(updateTask);
 const mockAgentFindUnique = vi.mocked(prisma.agent.findUnique);
-const mockBlockCreate = vi.mocked(prisma.taskWorkerBlock.create);
 
 const postingAgentId = 'agent-poster';
 const otherAgentId = 'agent-other';
@@ -75,8 +82,8 @@ function makePostRequest(apiKey: string | null) {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockUpdateTask.mockResolvedValue({ ...rejectedTask, status: 'open', assignedTo: null } as never);
-    mockBlockCreate.mockResolvedValue({} as never);
+    mockTxTaskUpdate.mockResolvedValue({ ...rejectedTask, status: 'open', assignedTo: null });
+    mockTxBlockUpsert.mockResolvedValue({});
 });
 
 describe('POST /api/tasks/[id]/reopen', () => {
@@ -102,8 +109,10 @@ describe('POST /api/tasks/[id]/reopen', () => {
             params: Promise.resolve({ id: 'task-1' }),
         });
 
-        expect(mockBlockCreate).toHaveBeenCalledWith({
-            data: { taskId: 'task-1', workerId: 'worker-1' },
+        expect(mockTxBlockUpsert).toHaveBeenCalledWith({
+            where: { taskId_workerId: { taskId: 'task-1', workerId: 'worker-1' } },
+            create: { taskId: 'task-1', workerId: 'worker-1' },
+            update: {},
         });
     });
 
@@ -115,9 +124,9 @@ describe('POST /api/tasks/[id]/reopen', () => {
             params: Promise.resolve({ id: 'task-1' }),
         });
 
-        expect(mockUpdateTask).toHaveBeenCalledWith('task-1', {
-            status: 'open',
-            assignedTo: null,
+        expect(mockTxTaskUpdate).toHaveBeenCalledWith({
+            where: { id: 'task-1' },
+            data: { status: 'open', assignedTo: null },
         });
     });
 
@@ -193,6 +202,6 @@ describe('POST /api/tasks/[id]/reopen', () => {
             params: Promise.resolve({ id: 'task-1' }),
         });
 
-        expect(mockBlockCreate).not.toHaveBeenCalled();
+        expect(mockTxBlockUpsert).not.toHaveBeenCalled();
     });
 });
