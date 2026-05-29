@@ -4,6 +4,7 @@
   "description": "A platform for human services to complement AI capabilities.",
   "main": "index.js",
   "scripts": {
+    "test": "vitest run",
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
@@ -39,7 +40,8 @@
     "react": "latest",
     "react-dom": "latest",
     "stripe": "^22.1.0",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.4",
@@ -49,6 +51,7 @@
     "postcss": "^8.5.14",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.21.0",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vitest": "^4.1.7"
   }
 }

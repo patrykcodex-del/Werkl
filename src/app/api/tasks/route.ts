@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listTasksPaged, createTask, type ListTasksOptions, type TaskSortField, type TaskSortOrder } from '../../../lib/taskStore';
+import { authenticateAgent } from '../../../lib/agentAuth';
 import type { TaskStatus, TaskType } from '../../../types';
-
-function isAuthorized(req: NextRequest): boolean {
-    const key = req.headers.get('x-api-key');
-    return key === process.env.WERKL_API_KEY;
-}
 
 export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
@@ -32,19 +28,27 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    if (!isAuthorized(req)) {
+    const apiKey = req.headers.get('x-api-key') ?? '';
+    const agent = await authenticateAgent(apiKey);
+    if (!agent) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (agent.suspended) {
+        return NextResponse.json({ error: 'Agent is suspended' }, { status: 403 });
     }
 
     const body = await req.json();
     const {
-        title, description, context, taskType, reward, postedBy,
+        title, description, context, taskType, reward,
         estimatedMins, claimTimeoutMins, completionMins, expiresAt, autoReassign,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        priority: _priority, // accepted for API compatibility but intentionally ignored —
+                             // priority is platform-computed from reward and deadline urgency
     } = body;
 
-    if (!title || !description || !postedBy) {
+    if (!title || !description) {
         return NextResponse.json(
-            { error: 'title, description and postedBy are required' },
+            { error: 'title and description are required' },
             { status: 400 }
         );
     }
@@ -77,7 +81,7 @@ export async function POST(req: NextRequest) {
         completionMins,
         expiresAt,
         autoReassign: autoReassign ?? true,
-        postedBy,
+        postedBy: agent.id,
     });
     return NextResponse.json(task, { status: 201 });
 }

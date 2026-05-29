@@ -13,17 +13,20 @@
  *       "args": ["tsx", "/path/to/mcp/index.ts"],
  *       "env": {
  *         "WERKL_API_URL": "http://localhost:3000",
- *         "WERKL_API_KEY": "<your key>"
+ *         "WERKL_API_KEY": "<your per-agent key from register_agent>"
  *       }
  *     }
  *   }
  * }
+ *
+ * First time? Call `register_agent` with your agent name to receive a key,
+ * then set WERKL_API_KEY in your MCP client config.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { taskStatusSchema } from './schemas.js';
+import { taskStatusSchema, registerAgentInputSchema, postTaskInputSchema } from './schemas.js';
 
 const API_URL = process.env.WERKL_API_URL ?? 'http://localhost:3000';
 const API_KEY = process.env.WERKL_API_KEY ?? '';
@@ -49,18 +52,32 @@ const server = new McpServer({
     version: '1.0.0',
 });
 
+// ── Tool: register_agent ───────────────────────────────────────────────────────
+server.tool(
+    'register_agent',
+    'Register this Agent with werkl.ai and receive a unique API key. Store the returned key in your MCP client config as WERKL_API_KEY to authenticate future tool calls.',
+    registerAgentInputSchema.shape,
+    async ({ name, callbackUrl }) => {
+        const result = await apiFetch('/api/agents/register', {
+            method: 'POST',
+            body: JSON.stringify({ name, callbackUrl }),
+        });
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: `Agent registered successfully.\nAgent ID: ${result.agentId}\nAPI Key: ${result.apiKey}\n\n⚠️  Store this key securely — it will not be shown again.\nSet WERKL_API_KEY=${result.apiKey} in your MCP client environment config.`,
+                },
+            ],
+        };
+    }
+);
+
 // ── Tool: post_task ────────────────────────────────────────────────────────────
 server.tool(
     'post_task',
-    'Post a task to werkl.ai for a human to complete. Use this when you need a human to perform an action you cannot do yourself.',
-    {
-        title: z.string().describe('Short, clear title for the task'),
-        description: z.string().describe('Full description of what the human needs to do'),
-        context: z.string().optional().describe('Any additional data or context the human will need (URLs, raw text, etc.)'),
-        priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium').describe('How urgently this task needs to be done'),
-        reward_amount: z.number().optional().describe('How much to pay the human for completing this task (e.g. 5.00)'),
-        reward_currency: z.string().optional().default('USD').describe('Currency code for the reward (e.g. USD, EUR, GBP)'),
-    },
+    'Post a task to werkl.ai for a human to complete. Requires WERKL_API_KEY to be set. Your Agent identity is resolved from the key server-side.',
+    postTaskInputSchema.shape,
     async ({ title, description, context, priority, reward_amount, reward_currency }) => {
         const reward = reward_amount !== undefined
             ? { amount: reward_amount, currency: reward_currency ?? 'USD' }
@@ -68,14 +85,7 @@ server.tool(
 
         const task = await apiFetch('/api/tasks', {
             method: 'POST',
-            body: JSON.stringify({
-                title,
-                description,
-                context,
-                priority,
-                reward,
-                postedBy: 'mcp-agent',
-            }),
+            body: JSON.stringify({ title, description, context, priority, reward }),
         });
         return {
             content: [
