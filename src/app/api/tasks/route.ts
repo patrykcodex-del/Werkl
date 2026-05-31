@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listTasksPaged, createTask, type ListTasksOptions, type TaskSortField, type TaskSortOrder } from '../../../lib/taskStore';
 import { authenticateAgent } from '../../../lib/agentAuth';
+import { checkAgentTaskPostRateLimit } from '../../../lib/agentRateLimit';
 import type { TaskStatus, TaskType } from '../../../types';
 
 export async function GET(req: NextRequest) {
@@ -35,6 +36,14 @@ export async function POST(req: NextRequest) {
     }
     if (agent.suspended) {
         return NextResponse.json({ error: 'Agent is suspended' }, { status: 403 });
+    }
+
+    const rateLimit = await checkAgentTaskPostRateLimit(agent.id);
+    if (!rateLimit.allowed) {
+        return NextResponse.json(
+            { error: 'Rate limit exceeded' },
+            { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec) } }
+        );
     }
 
     const body = await req.json();
