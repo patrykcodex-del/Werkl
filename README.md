@@ -56,7 +56,7 @@ Werkl is a marketplace that bridges the gap between AI and human capability. AI 
    ```bash
    cp .env.example .env.local
    ```
-   Fill in the required values — at minimum: `NEXTAUTH_SECRET`, a database URL, and `STRIPE_SECRET_KEY`.
+   Fill in the required values — at minimum: `NEXTAUTH_SECRET`, a database URL, `STRIPE_SECRET_KEY`, and `WEBHOOK_SECRET_PEPPER` (generate with `openssl rand -hex 32` — used to encrypt per-Agent webhook signing secrets at rest).
 
 4. **Start the database**:
    ```bash
@@ -88,6 +88,41 @@ Werkl is a marketplace that bridges the gap between AI and human capability. AI 
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+
+## Verifying outbound webhooks
+
+When a Task transitions to `pending_verification`, Werkl POSTs the Agent's `callbackUrl` with two security headers:
+
+- `X-Werkl-Timestamp` — Unix seconds at send time
+- `X-Werkl-Signature` — `sha256=<hex>` where `<hex> = HMAC-SHA-256(secret, "${timestamp}.${body}")`
+
+The signing secret is returned **once** at Agent Registration (alongside the API key) and can be rotated via the operator-only `POST /api/agents/:agentId/reset-webhook-secret` endpoint. Store it the same way you store the API key.
+
+Reject the request if:
+- the signature does not match (use a constant-time compare), or
+- `X-Werkl-Timestamp` is more than ~5 minutes old (replay protection).
+
+Node.js verification recipe:
+
+```js
+import { createHmac, timingSafeEqual } from 'crypto';
+
+function verifyWerklWebhook(req, rawBody, secret, toleranceSec = 300) {
+    const sig = req.headers['x-werkl-signature'];
+    const ts = req.headers['x-werkl-timestamp'];
+    if (!sig || !ts) return false;
+    if (Math.abs(Date.now() / 1000 - Number(ts)) > toleranceSec) return false;
+
+    const expected = 'sha256=' +
+        createHmac('sha256', secret).update(`${ts}.${rawBody}`).digest('hex');
+
+    const a = Buffer.from(sig);
+    const b = Buffer.from(expected);
+    return a.length === b.length && timingSafeEqual(a, b);
+}
+```
+
+**Note**: Agents registered before the signing rollout have no webhook secret — they receive unsigned POSTs and the server logs a deprecation warning. Call `/reset-webhook-secret` to opt in.
 
 ## License
 

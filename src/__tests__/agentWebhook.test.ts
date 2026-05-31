@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createHmac } from 'crypto';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -81,6 +82,53 @@ describe('fireAgentWebhook', () => {
         expect(console.warn).toHaveBeenCalledWith(
             expect.stringContaining('webhook'),
             expect.anything()
+        );
+    });
+
+    it('includes X-Werkl-Signature and X-Werkl-Timestamp headers when a webhookSecret is provided', async () => {
+        mockFetch.mockResolvedValue({ ok: true, status: 200 });
+        const secret = 'agent-shared-secret';
+        const payload = {
+            taskId: 'task-1',
+            status: 'pending_verification' as const,
+            title: 'Test Task',
+        };
+
+        fireAgentWebhook('https://agent.example.com/webhook', payload, secret);
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(mockFetch).toHaveBeenCalledOnce();
+        const [, init] = mockFetch.mock.calls[0];
+        const headers = init.headers as Record<string, string>;
+        const body = init.body as string;
+
+        expect(headers['X-Werkl-Timestamp']).toMatch(/^\d+$/);
+        const expectedSig =
+            'sha256=' +
+            createHmac('sha256', secret)
+                .update(`${headers['X-Werkl-Timestamp']}.${body}`)
+                .digest('hex');
+        expect(headers['X-Werkl-Signature']).toBe(expectedSig);
+    });
+
+    it('sends unsigned and logs a deprecation warning when webhookSecret is null (legacy Agent)', async () => {
+        mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+        fireAgentWebhook(
+            'https://agent.example.com/webhook',
+            { taskId: 'task-1', status: 'pending_verification', title: 'Test Task' },
+            null,
+        );
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(mockFetch).toHaveBeenCalledOnce();
+        const [, init] = mockFetch.mock.calls[0];
+        const headers = init.headers as Record<string, string>;
+        expect(headers['X-Werkl-Signature']).toBeUndefined();
+        expect(headers['X-Werkl-Timestamp']).toBeUndefined();
+        expect(console.warn).toHaveBeenCalledWith(
+            expect.stringContaining('deprecat'),
+            expect.anything(),
         );
     });
 });

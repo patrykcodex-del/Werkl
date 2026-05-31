@@ -214,16 +214,17 @@ model TaskReleaseEvent {
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
 model Agent {
-  id               String   @id @default(cuid())
-  name             String
-  apiKeyHash       String   @unique
-  callbackUrl      String?
-  suspended        Boolean  @default(false)
-  tasksPostedCount Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  name                   String
+  apiKeyHash             String   @unique
+  webhookSecretEncrypted String?
+  callbackUrl            String?
+  suspended              Boolean  @default(false)
+  tasksPostedCount       Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  tasks            Task[]
+  tasks                  Task[]
 }
 
 // ─── TaskWorkerBlock ──────────────────────────────────────────────────────────

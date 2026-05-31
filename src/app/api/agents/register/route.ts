@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '../../../../lib/prisma';
 import { generateApiKey, hashApiKey } from '../../../../lib/agentAuth';
+import { generateWebhookSecret, encryptWebhookSecret } from '../../../../lib/webhookAuth';
 
 const registerBodySchema = z.object({
     name: z.string().min(1, 'name is required').transform((s: string) => s.trim()),
@@ -27,14 +28,17 @@ export async function POST(req: NextRequest) {
 
     const apiKey = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
+    const webhookSecret = generateWebhookSecret();
+    const webhookSecretEncrypted = encryptWebhookSecret(webhookSecret);
 
     const agent = await prisma.agent.create({
         data: {
             name,
             apiKeyHash,
+            webhookSecretEncrypted,
             callbackUrl: callbackUrl ?? null,
         },
     });
 
-    return NextResponse.json({ agentId: agent.id, apiKey }, { status: 201 });
+    return NextResponse.json({ agentId: agent.id, apiKey, webhookSecret }, { status: 201 });
 }

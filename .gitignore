@@ -6,3 +6,5 @@ out/
 
 /src/generated/prisma
 .env
+
+tsconfig.tsbuildinfo

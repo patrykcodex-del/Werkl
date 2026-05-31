@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 process.env.API_KEY_PEPPER = 'test-pepper';
+process.env.WEBHOOK_SECRET_PEPPER = '0'.repeat(64);
 
 vi.mock('../lib/taskStore', () => ({
     getTask: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('next-auth', () => ({
 import { PATCH } from '../app/api/tasks/[id]/route';
 import { getTask, updateTask } from '../lib/taskStore';
 import { prisma } from '../lib/prisma';
+import { encryptWebhookSecret } from '../lib/webhookAuth';
 
 const mockGetTask = vi.mocked(getTask);
 const mockUpdateTask = vi.mocked(updateTask);
@@ -68,6 +70,7 @@ describe('PATCH /api/tasks/[id] — pending_verification webhook', () => {
         mockAgentFindUnique.mockResolvedValue({
             id: 'agent-poster',
             callbackUrl: 'https://agent.example.com/webhook',
+            webhookSecretEncrypted: null,
         } as never);
 
         const res = await PATCH(
@@ -79,7 +82,8 @@ describe('PATCH /api/tasks/[id] — pending_verification webhook', () => {
         expect(mockFireAgentWebhook).toHaveBeenCalledOnce();
         expect(mockFireAgentWebhook).toHaveBeenCalledWith(
             'https://agent.example.com/webhook',
-            { taskId: 'task-1', status: 'pending_verification', title: 'Test Task' }
+            { taskId: 'task-1', status: 'pending_verification', title: 'Test Task' },
+            null,
         );
     });
 
@@ -88,6 +92,7 @@ describe('PATCH /api/tasks/[id] — pending_verification webhook', () => {
         mockAgentFindUnique.mockResolvedValue({
             id: 'agent-poster',
             callbackUrl: null,
+            webhookSecretEncrypted: null,
         } as never);
 
         const res = await PATCH(
@@ -109,5 +114,27 @@ describe('PATCH /api/tasks/[id] — pending_verification webhook', () => {
         );
 
         expect(res.status).toBe(200);
+    });
+
+    it('passes the decrypted webhookSecret as the third arg when the Agent has one stored', async () => {
+        const plaintextSecret = 'a'.repeat(64);
+        mockGetTask.mockResolvedValue(claimedTask as never);
+        mockAgentFindUnique.mockResolvedValue({
+            id: 'agent-poster',
+            callbackUrl: 'https://agent.example.com/webhook',
+            webhookSecretEncrypted: encryptWebhookSecret(plaintextSecret),
+        } as never);
+
+        const res = await PATCH(
+            makeWorkerPatchRequest({ status: 'pending_verification', result: 'Done!' }),
+            { params: Promise.resolve({ id: 'task-1' }) }
+        );
+
+        expect(res.status).toBe(200);
+        expect(mockFireAgentWebhook).toHaveBeenCalledWith(
+            'https://agent.example.com/webhook',
+            { taskId: 'task-1', status: 'pending_verification', title: 'Test Task' },
+            plaintextSecret,
+        );
     });
 });

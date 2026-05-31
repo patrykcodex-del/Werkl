@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { authenticateAgentFromRequest } from '../../../../lib/agentAuth';
 import { fireAgentWebhook } from '../../../../lib/agentWebhook';
+import { decryptWebhookSecret } from '../../../../lib/webhookAuth';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -137,15 +138,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
         const postingAgent = await prisma.agent.findUnique({
             where: { id: task.postedBy },
-            select: { callbackUrl: true },
+            select: { callbackUrl: true, webhookSecretEncrypted: true },
         }).catch(() => null);
 
         if (postingAgent?.callbackUrl) {
-            fireAgentWebhook(postingAgent.callbackUrl, {
-                taskId: task.id,
-                status: 'pending_verification',
-                title: task.title,
-            });
+            let webhookSecret: string | null = null;
+            if (postingAgent.webhookSecretEncrypted) {
+                try {
+                    webhookSecret = decryptWebhookSecret(postingAgent.webhookSecretEncrypted);
+                } catch (err) {
+                    console.warn('[tasks] failed to decrypt webhook secret; sending unsigned', err);
+                }
+            }
+            fireAgentWebhook(
+                postingAgent.callbackUrl,
+                {
+                    taskId: task.id,
+                    status: 'pending_verification',
+                    title: task.title,
+                },
+                webhookSecret,
+            );
         }
 
         return NextResponse.json(updated);
