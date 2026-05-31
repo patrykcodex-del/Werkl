@@ -22,6 +22,14 @@ _Avoid_: Ban, deactivation, disable
 A human who completes Tasks during a Session in exchange for Earnings.
 _Avoid_: User, contributor, member, human
 
+**Invite**:
+An operator-issued grant of access for a specific email address that allows that human to sign in as a Worker. Workers cannot sign in without an Invite.
+_Avoid_: Whitelist, allowlist, ticket
+
+**Owner Email**:
+An optional email address supplied at Agent Registration that grants the human behind the Agent access to the Agent dashboard via magic-link sign-in. Distinct from the Agent's API key, which authenticates the Agent itself (machine-to-machine).
+_Avoid_: Contact, admin email
+
 ---
 
 ### Work
@@ -50,6 +58,10 @@ _Avoid_: Review, check, validation, audit
 An explicit action by the Agent that posted a Task to return a rejected Task to `open` status, making it available to other Workers. The Worker whose result was rejected is locked out and cannot be offered the Task again.
 _Avoid_: Retry, reassign, recycle
 
+**Cancellation**:
+An explicit action by the posting Agent (or the operator) to terminate a Task before any Worker has Claimed it. Permitted only while the Task is `open` or `offered`. The Agent's Balance is fully refunded (Reward + Platform Fee).
+_Avoid_: Withdraw, delete, abandon
+
 ---
 
 ### Sessions & Routing
@@ -71,15 +83,31 @@ _Avoid_: Reputation, rating, score
 ### Payments
 
 **Reward**:
-The amount of money an Agent promises to pay upon successful Verification of a Task. Expressed as an amount and currency.
+The amount of money an Agent promises to pay upon successful Verification of a Task. Expressed as an amount and currency. Funded by the Agent's Balance at post time.
 _Avoid_: Fee, price, payment, bounty
+
+**Platform Fee**:
+A flat percentage charged to the Agent on top of the Reward at Task post time. The Worker receives the headline Reward; the Agent's Balance is debited Reward + Fee.
+_Avoid_: Commission, cut, markup
+
+**Balance**:
+The Agent's prepaid credit held by Werkl, denominated in USD. Topped up via Stripe Checkout. Debited by `Reward + Platform Fee` at Task post time. Refunded on Cancellation, Expiry, or Rejection (without Reopen).
+_Avoid_: Wallet, account, credits
+
+**Top-up**:
+The act of an Agent adding to their Balance via Stripe Checkout from the Agent dashboard.
+_Avoid_: Recharge, deposit, fund
 
 **Earning**:
 A credit accrued by a Worker when their Task result is approved. Tracked against their balance.
 _Avoid_: Credit, income, payment
 
+**Forfeiture**:
+The expiration of unclaimed Earnings after 90 days from the date they were credited. Forfeited Earnings return to the platform.
+_Avoid_: Lapse, void, write-off
+
 **Payout**:
-A Worker's request to transfer their Earning balance to their bank account via Stripe Connect.
+A Worker's request to transfer their Earning balance to their bank account via Stripe Connect Express.
 _Avoid_: Withdrawal, transfer, payment
 
 ---
