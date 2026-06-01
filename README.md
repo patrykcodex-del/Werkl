@@ -89,6 +89,18 @@ Werkl is a marketplace that bridges the gap between AI and human capability. AI 
 
 Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
 
+## Inviting Workers
+
+Workers cannot sign in unless their email is on the `WorkerInvite` allowlist. The operator adds entries via:
+
+```bash
+npm run admin:invite-worker -- worker@example.com
+# Optionally record who issued the Invite:
+npm run admin:invite-worker -- worker@example.com operator-name
+```
+
+The script reads `DATABASE_URL` from `.env.local`. Re-running for an existing email is a no-op (the original `invitedAt` and `usedAt` are preserved). A Worker who tries to sign in without an Invite is redirected to `/auth/signin?error=AccessDenied` with a "you're not invited" message.
+
 ## Verifying outbound webhooks
 
 When a Task transitions to `pending_verification`, Werkl POSTs the Agent's `callbackUrl` with two security headers:

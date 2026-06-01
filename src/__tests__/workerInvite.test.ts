@@ -5,15 +5,17 @@ vi.mock('../lib/prisma', () => ({
         workerInvite: {
             findUnique: vi.fn(),
             update: vi.fn(),
+            upsert: vi.fn(),
         },
     },
 }));
 
-import { gateWorkerSignIn } from '../lib/workerInvite';
+import { gateWorkerSignIn, inviteWorker } from '../lib/workerInvite';
 import { prisma } from '../lib/prisma';
 
 const mockFind = vi.mocked(prisma.workerInvite.findUnique);
 const mockUpdate = vi.mocked(prisma.workerInvite.update);
+const mockUpsert = vi.mocked(prisma.workerInvite.upsert);
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -76,5 +78,43 @@ describe('gateWorkerSignIn', () => {
 
         expect(result).toBe(true);
         expect(mockUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe('inviteWorker', () => {
+    it('upserts an Invite with the supplied email and invitedBy', async () => {
+        mockUpsert.mockResolvedValueOnce({
+            email: 'new@example.com',
+            invitedAt: new Date(),
+            invitedBy: 'operator',
+            usedAt: null,
+        } as never);
+
+        await inviteWorker({ email: 'new@example.com', invitedBy: 'operator' });
+
+        expect(mockUpsert).toHaveBeenCalledTimes(1);
+        const call = mockUpsert.mock.calls[0][0] as {
+            where: { email: string };
+            create: { email: string; invitedBy?: string };
+            update: Record<string, never>;
+        };
+        expect(call.where).toEqual({ email: 'new@example.com' });
+        expect(call.create.email).toBe('new@example.com');
+        expect(call.create.invitedBy).toBe('operator');
+        expect(call.update).toEqual({});
+    });
+
+    it('normalizes the email to lowercase and trims whitespace', async () => {
+        mockUpsert.mockResolvedValueOnce({} as never);
+
+        await inviteWorker({ email: '  Worker@Example.COM  ' });
+
+        const call = mockUpsert.mock.calls[0][0] as { where: { email: string } };
+        expect(call.where.email).toBe('worker@example.com');
+    });
+
+    it('rejects an empty email', async () => {
+        await expect(inviteWorker({ email: '   ' })).rejects.toThrow(/email/i);
+        expect(mockUpsert).not.toHaveBeenCalled();
     });
 });

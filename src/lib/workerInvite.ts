@@ -16,3 +16,19 @@ export async function gateWorkerSignIn({
     }
     return true;
 }
+
+export async function inviteWorker({
+    email,
+    invitedBy,
+}: {
+    email: string;
+    invitedBy?: string;
+}): Promise<void> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) throw new Error('email is required');
+    await prisma.workerInvite.upsert({
+        where: { email: normalized },
+        create: { email: normalized, invitedBy },
+        update: {},
+    });
+}

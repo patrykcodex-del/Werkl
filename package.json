@@ -14,7 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "dotenv -e .env.local -- tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "admin:invite-worker": "dotenv -e .env.local -- tsx scripts/invite-worker.ts"
   },
   "keywords": [
     "nextjs",
