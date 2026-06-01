@@ -6,15 +6,23 @@ export async function gateWorkerSignIn({
     email: string | null | undefined;
 }): Promise<boolean> {
     if (!email) return false;
-    const invite = await prisma.workerInvite.findUnique({ where: { email } });
-    if (!invite) return false;
-    if (!invite.usedAt) {
-        await prisma.workerInvite.update({
-            where: { email },
-            data: { usedAt: new Date() },
-        });
+    try {
+        const invite = await prisma.workerInvite.findUnique({ where: { email } });
+        if (!invite) return false;
+        if (!invite.usedAt) {
+            await prisma.workerInvite.update({
+                where: { email },
+                data: { usedAt: new Date() },
+            });
+        }
+        return true;
+    } catch (err) {
+        // Never surface the raw error — NextAuth would echo it into the
+        // redirect URL, leaking schema/ORM details. Log server-side and
+        // fail closed.
+        console.error('gateWorkerSignIn: Invite lookup failed', err);
+        return false;
     }
-    return true;
 }
 
 export async function inviteWorker({

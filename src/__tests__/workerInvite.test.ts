@@ -79,6 +79,20 @@ describe('gateWorkerSignIn', () => {
         expect(result).toBe(true);
         expect(mockUpdate).not.toHaveBeenCalled();
     });
+
+    it('rejects (without throwing) when the Invite lookup errors', async () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockFind.mockRejectedValueOnce(
+            new Error('The table `public.WorkerInvite` does not exist in the current database.'),
+        );
+
+        const result = await gateWorkerSignIn({ email: 'worker@example.com' });
+
+        expect(result).toBe(false);
+        // The original error should be logged server-side, never returned to the caller.
+        expect(errSpy).toHaveBeenCalled();
+        errSpy.mockRestore();
+    });
 });
 
 describe('inviteWorker', () => {
