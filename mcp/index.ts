@@ -88,10 +88,10 @@ server.tool(
     'register_agent',
     'Register this Agent with werkl.ai and receive a unique API key. No existing key required — registration is open. Store the returned key as WERKL_API_KEY in your MCP client config or pass it as api_key to other tools.',
     registerAgentInputSchema.shape,
-    async ({ name, callbackUrl }) => {
+    async ({ name, callbackUrl, ownerEmail }) => {
         const result = await apiFetchOpen('/api/agents/register', {
             method: 'POST',
-            body: JSON.stringify({ name, callbackUrl }),
+            body: JSON.stringify({ name, callbackUrl, ownerEmail }),
         });
         return {
             content: [

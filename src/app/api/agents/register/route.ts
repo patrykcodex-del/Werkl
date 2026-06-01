@@ -7,6 +7,7 @@ import { generateWebhookSecret, encryptWebhookSecret } from '../../../../lib/web
 const registerBodySchema = z.object({
     name: z.string().min(1, 'name is required').transform((s: string) => s.trim()),
     callbackUrl: z.string().url('callbackUrl must be a valid URL').optional(),
+    ownerEmail: z.string().email('ownerEmail must be a valid email').optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
         const message = parsed.error.issues[0]?.message ?? 'Invalid request body';
         return NextResponse.json({ error: message }, { status: 400 });
     }
-    const { name, callbackUrl } = parsed.data;
+    const { name, callbackUrl, ownerEmail } = parsed.data;
 
     const existing = await prisma.agent.findFirst({ where: { name } });
     if (existing) {
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
             apiKeyHash,
             webhookSecretEncrypted,
             callbackUrl: callbackUrl ?? null,
+            ownerEmail: ownerEmail ?? null,
         },
     });
 

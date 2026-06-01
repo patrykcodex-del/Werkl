@@ -75,4 +75,27 @@ describe('POST /api/agents/register', () => {
         const call = mockCreate.mock.calls[0][0] as any;
         expect(call.data.apiKeyHash).not.toBe(call.data.webhookSecretEncrypted);
     });
+
+    it('persists ownerEmail when supplied at registration', async () => {
+        const res = await POST(
+            makeRequest({ name: 'agent-1', ownerEmail: 'owner@example.com' }),
+        );
+        expect(res.status).toBe(201);
+        const call = mockCreate.mock.calls[0][0] as any;
+        expect(call.data.ownerEmail).toBe('owner@example.com');
+    });
+
+    it('stores ownerEmail as null when omitted', async () => {
+        await POST(makeRequest({ name: 'agent-1' }));
+        const call = mockCreate.mock.calls[0][0] as any;
+        expect(call.data.ownerEmail).toBeNull();
+    });
+
+    it('returns 400 and does not create an Agent when ownerEmail is malformed', async () => {
+        const res = await POST(
+            makeRequest({ name: 'agent-1', ownerEmail: 'not-an-email' }),
+        );
+        expect(res.status).toBe(400);
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
 });

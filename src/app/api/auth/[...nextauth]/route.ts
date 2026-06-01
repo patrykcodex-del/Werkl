@@ -104,6 +104,10 @@ export const authOptions: NextAuthOptions = {
                 if (session.user && token.sub) {
                     (session.user as typeof session.user & { id: string }).id = token.sub;
                 }
+                if (session.user && typeof (token as any).agentId === 'string') {
+                    (session.user as typeof session.user & { agentId: string }).agentId =
+                        (token as any).agentId;
+                }
             } catch {
                 // swallow – fall back to an anonymous session
                 return { ...session, user: undefined, expires: session.expires };

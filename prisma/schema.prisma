@@ -219,12 +219,35 @@ model Agent {
   apiKeyHash             String   @unique
   webhookSecretEncrypted String?
   callbackUrl            String?
+  ownerEmail             String?
   suspended              Boolean  @default(false)
   tasksPostedCount       Int      @default(0)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  tasks Task[]
+  tasks       Task[]
+  ownerTokens AgentOwnerToken[]
+
+  @@index([ownerEmail])
+}
+
+// ─── AgentOwnerToken ──────────────────────────────────────────────────────────
+// Single-use magic-link tokens for Agent owner dashboard sign-in. Scoped to
+// one Agent so one human can own multiple Agents without picker UI.
+
+model AgentOwnerToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  agentId    String
+  email      String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id])
+
+  @@index([agentId])
+  @@index([email])
 }
 
 // ─── TaskWorkerBlock ──────────────────────────────────────────────────────────

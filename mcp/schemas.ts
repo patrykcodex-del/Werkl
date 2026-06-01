@@ -22,6 +22,11 @@ export const registerAgentInputSchema = z.object({
         .url()
         .optional()
         .describe('Webhook URL to notify when a Task reaches pending_verification'),
+    ownerEmail: z
+        .string()
+        .email()
+        .optional()
+        .describe('Owner Email — magic-link sign-in for the human behind this Agent (optional)'),
 });
 
 // ── post_task ──────────────────────────────────────────────────────────────────

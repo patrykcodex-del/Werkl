@@ -27,4 +27,22 @@ describe('register_agent tool schema', () => {
             }).success
         ).toBe(false);
     });
+
+    it('accepts an optional ownerEmail', () => {
+        expect(
+            registerAgentInputSchema.safeParse({
+                name: 'my-agent',
+                ownerEmail: 'owner@example.com',
+            }).success
+        ).toBe(true);
+    });
+
+    it('rejects a malformed ownerEmail', () => {
+        expect(
+            registerAgentInputSchema.safeParse({
+                name: 'my-agent',
+                ownerEmail: 'not-an-email',
+            }).success
+        ).toBe(false);
+    });
 });

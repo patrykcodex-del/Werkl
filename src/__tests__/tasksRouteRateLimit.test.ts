@@ -31,6 +31,7 @@ const fakeAgent = {
     apiKeyHash: hashApiKey('valid-key'),
     webhookSecretEncrypted: null,
     callbackUrl: null,
+    ownerEmail: null,
     suspended: false,
     tasksPostedCount: 0,
     createdAt: new Date(),
