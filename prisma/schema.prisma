@@ -72,6 +72,7 @@ model Task {
   // Rewards
   rewardAmount   Float?
   rewardCurrency String?
+  feeCents       Int          @default(0)
 
   // Time limits
   estimatedMins    Int? // estimated work duration in minutes
@@ -105,6 +106,32 @@ model Task {
   offers        TaskOffer[]
   releaseEvents TaskReleaseEvent[]
   workerBlocks  TaskWorkerBlock[]
+  balanceLedger BalanceLedger[]
+}
+
+model AgentBalance {
+  agentId      String   @id
+  balanceCents Int      @default(0)
+  currency     String   @default("USD")
+  updatedAt    DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id])
+}
+
+model BalanceLedger {
+  id          String   @id @default(cuid())
+  agentId     String
+  taskId      String?
+  amountCents Int
+  currency    String   @default("USD")
+  type        String
+  createdAt   DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id])
+  task  Task? @relation(fields: [taskId], references: [id])
+
+  @@index([agentId, createdAt])
+  @@index([taskId])
 }
 
 model EarningEntry {
@@ -225,8 +252,10 @@ model Agent {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  tasks       Task[]
-  ownerTokens AgentOwnerToken[]
+  tasks         Task[]
+  ownerTokens   AgentOwnerToken[]
+  balance       AgentBalance?
+  balanceLedger BalanceLedger[]
 
   @@index([ownerEmail])
 }

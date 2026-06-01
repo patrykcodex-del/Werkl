@@ -42,6 +42,8 @@ export interface Task {
     priority: TaskPriority;
     taskType: TaskType;
     reward?: TaskReward;
+    rewardCents?: number;
+    feeCents?: number;
 
     // Time limits
     estimatedMins?: number;

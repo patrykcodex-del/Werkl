@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import type { Task, TaskStatus, TaskPriority, TaskType, TaskReward } from '../types';
 import type { Task as PrismaTask } from '../generated/prisma/client';
+import { rewardAmountToCents } from './billing';
 
 // ─── Platform-computed priority ──────────────────────────────────────────────
 // Agents cannot self-assign priority. The platform derives it from deadline
@@ -21,6 +22,7 @@ function computePriority(p: PrismaTask): TaskPriority {
 // ─── Mapping ─────────────────────────────────────────────────────────────────
 
 function toTask(p: PrismaTask): Task {
+    const feeCents = 'feeCents' in p && typeof p.feeCents === 'number' ? p.feeCents : 0;
     return {
         id: p.id,
         title: p.title,
@@ -33,6 +35,8 @@ function toTask(p: PrismaTask): Task {
             p.rewardAmount != null && p.rewardCurrency != null
                 ? { amount: p.rewardAmount, currency: p.rewardCurrency }
                 : undefined,
+        rewardCents: p.rewardAmount != null ? rewardAmountToCents(p.rewardAmount) : undefined,
+        feeCents,
         estimatedMins: p.estimatedMins ?? undefined,
         claimTimeoutMins: p.claimTimeoutMins,
         completionMins: p.completionMins ?? undefined,
@@ -171,6 +175,7 @@ export async function createTask(data: {
     context?: string;
     taskType?: TaskType;
     reward?: TaskReward;
+    feeCents?: number;
     estimatedMins?: number;
     claimTimeoutMins?: number;
     completionMins?: number;
@@ -187,6 +192,7 @@ export async function createTask(data: {
             taskType: (data.taskType ?? 'async') as TaskType,
             rewardAmount: data.reward?.amount,
             rewardCurrency: data.reward?.currency,
+            feeCents: data.feeCents ?? 0,
             estimatedMins: data.estimatedMins,
             claimTimeoutMins: data.claimTimeoutMins ?? 5,
             completionMins: data.completionMins,

@@ -123,7 +123,7 @@ server.tool(
             content: [
                 {
                     type: 'text',
-                    text: `Task created successfully.\nID: ${task.id}\nTitle: ${task.title}\nStatus: ${task.status}\nReward: ${reward ? `${reward.amount} ${reward.currency}` : 'none'}\n\nUse check_task_status with this ID to poll for a human response.`,
+                    text: `Task created successfully.\nID: ${task.id}\nTitle: ${task.title}\nStatus: ${task.status}\nReward: ${task.rewardCents ?? 'none'} cents\nFee: ${task.feeCents ?? 0} cents\n\nUse check_task_status with this ID to poll for a human response.`,
                 },
             ],
         };

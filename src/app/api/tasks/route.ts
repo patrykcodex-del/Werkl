@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listTasksPaged, createTask, type ListTasksOptions, type TaskSortField, type TaskSortOrder } from '../../../lib/taskStore';
 import { authenticateAgent } from '../../../lib/agentAuth';
 import { checkAgentTaskPostRateLimit } from '../../../lib/agentRateLimit';
+import { prisma } from '../../../lib/prisma';
+import { calculatePlatformFeeCents, PLATFORM_CURRENCY, rewardAmountToCents } from '../../../lib/billing';
 import type { TaskStatus, TaskType } from '../../../types';
 
 export async function GET(req: NextRequest) {
@@ -69,6 +71,10 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    if (reward && reward.currency !== PLATFORM_CURRENCY) {
+        return NextResponse.json({ error: 'Unsupported Currency' }, { status: 400 });
+    }
+
     if (estimatedMins !== undefined && (typeof estimatedMins !== 'number' || estimatedMins <= 0)) {
         return NextResponse.json({ error: 'estimatedMins must be a positive number' }, { status: 400 });
     }
@@ -81,10 +87,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'expiresAt must be a valid ISO date string' }, { status: 400 });
     }
 
+    const rewardCents = reward ? rewardAmountToCents(reward.amount) : 0;
+    const feeCents = reward ? calculatePlatformFeeCents(rewardCents) : 0;
+
+    if (reward) {
+        const balance = await prisma.agentBalance.findUnique({ where: { agentId: agent.id } });
+        const totalCents = rewardCents + feeCents;
+        if (!balance || balance.currency !== PLATFORM_CURRENCY || balance.balanceCents < totalCents) {
+            return NextResponse.json({ error: 'Insufficient balance' }, { status: 402 });
+        }
+    }
+
     const task = await createTask({
         title, description, context,
         taskType: (taskType ?? 'async') as TaskType,
         reward,
+        feeCents,
         estimatedMins,
         claimTimeoutMins: claimTimeoutMins ?? 5,
         completionMins,
@@ -92,6 +110,22 @@ export async function POST(req: NextRequest) {
         autoReassign: autoReassign ?? true,
         postedBy: agent.id,
     });
+
+    if (reward) {
+        await prisma.agentBalance.update({
+            where: { agentId: agent.id },
+            data: { balanceCents: { decrement: rewardCents + feeCents } },
+        });
+        await prisma.balanceLedger.create({
+            data: {
+                agentId: agent.id,
+                taskId: task.id,
+                amountCents: -(rewardCents + feeCents),
+                currency: PLATFORM_CURRENCY,
+                type: 'post_task',
+            },
+        });
+    }
     return NextResponse.json(task, { status: 201 });
 }
 
