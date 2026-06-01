@@ -32,7 +32,7 @@
     "@types/pg": "^8.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "next": "latest",
+    "next": "^16.2.7",
     "next-auth": "^4.24.14",
     "next-themes": "^0.4.6",
     "pg": "^8.20.0",
@@ -48,10 +48,17 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "dotenv-cli": "^11.0.0",
-    "postcss": "^8.5.14",
+    "postcss": "^8.5.15",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.21.0",
     "typescript": "latest",
     "vitest": "^4.1.7"
+  },
+  "overrides": {
+    "@hono/node-server": "^1.19.13",
+    "postcss": "^8.5.15",
+    "next-auth": {
+      "uuid": "^11.1.1"
+    }
   }
 }
