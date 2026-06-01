@@ -2,6 +2,7 @@
 
 import { getProviders, signIn } from 'next-auth/react';
 import { useEffect, useRef, useState } from 'react';
+import { resolveAuthErrorMessage } from '../lib/authErrorMessages';
 
 type ProviderRecord = Record<
     string,
@@ -23,13 +24,6 @@ export interface AuthDialogProps {
     variant?: 'dialog' | 'page';
 }
 
-const ERROR_MESSAGES: Record<string, string> = {
-    OAuthCallback: 'Something went wrong during sign-in. Please try again.',
-    OAuthSignin: 'Could not start the sign-in flow. Please try again.',
-    OAuthCreateAccount: 'Could not create your account. Please try again.',
-    Callback: 'Sign-in callback failed. Please try again.',
-    Default: 'An unexpected error occurred. Please try again.',
-};
 
 /* ── Provider icons ───────────────────────────────────────────────────────── */
 
@@ -277,7 +271,7 @@ export function AuthDialog({
         setLoadingId(null);
     }
 
-    const errorMsg = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.Default) : null;
+    const errorMsg = resolveAuthErrorMessage(error);
 
     // ── Page variant ──────────────────────────────────────────────────────────
     if (variant === 'page') {

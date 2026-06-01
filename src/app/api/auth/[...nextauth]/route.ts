@@ -7,6 +7,7 @@ import AzureADProvider from 'next-auth/providers/azure-ad';
 import AppleProvider from 'next-auth/providers/apple';
 import LinkedInProvider from 'next-auth/providers/linkedin';
 import type { NextAuthOptions } from 'next-auth';
+import { gateWorkerSignIn } from '../../../../lib/workerInvite';
 
 function buildProviders(): NextAuthOptions['providers'] {
     const providers: NextAuthOptions['providers'] = [];
@@ -95,6 +96,9 @@ export const authOptions: NextAuthOptions = {
         error: '/auth/signin',
     },
     callbacks: {
+        async signIn({ user }) {
+            return gateWorkerSignIn({ email: user?.email });
+        },
         async session({ session, token }) {
             try {
                 if (session.user && token.sub) {
