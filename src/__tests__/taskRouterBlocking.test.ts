@@ -132,7 +132,7 @@ describe('taskRouter — TaskWorkerBlock exclusion', () => {
 
         // Find the open-tasks query by matching where.status === 'open'
         const openTasksCall = mockTx.task.findMany.mock.calls.find(
-            (call: [{ where?: { status?: string } }]) => call[0]?.where?.status === 'open'
+            (call) => (call[0] as { where?: { status?: string } } | undefined)?.where?.status === 'open'
         );
         expect(openTasksCall).toBeDefined();
         expect(openTasksCall![0].where.id?.notIn).toContain(BLOCKED_TASK_ID);

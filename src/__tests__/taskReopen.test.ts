@@ -185,7 +185,7 @@ describe('POST /api/tasks/[id]/reopen', () => {
 
     it('returns 404 when the Task does not exist', async () => {
         mockAgentFindUnique.mockResolvedValueOnce(postingAgent as never);
-        mockGetTask.mockResolvedValueOnce(null);
+        mockGetTask.mockResolvedValueOnce(null as never);
 
         const res = await POST(makePostRequest('posting-key'), {
             params: Promise.resolve({ id: 'nonexistent' }),
